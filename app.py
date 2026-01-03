@@ -23,7 +23,6 @@ def load_lottieurl(url: str):
 
 lottie_success = load_lottieurl("https://lottie.host/5a2d67a1-94a3-4886-905c-5912389d4d03/GjX1Xl9T8y.json")
 
-# --- CSS PRECISÃO ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -68,34 +67,36 @@ if st.session_state.show_anim and lottie_success:
     st.session_state.show_anim = False
     st.rerun()
 
-# --- TELAS DE CONFIGURAÇÃO (0 A 3) ---
-# [O código das etapas anteriores permanece igual ao da V26]
-# ... (Aqui viria o código de Liquidez, Entradas, Custos e Alocação) ...
+# --- ETAPAS DE 0 A 3 (OMITIDAS PARA FOCO NO PASSO 4) ---
+# ... (Manter as etapas anteriores conforme V27) ...
 
-# --- DASHBOARD DINÂMICO (PASSO 4) ---
+# --- DASHBOARD REAL-TIME (PASSO 4) ---
 if st.session_state.step == 4:
     st.markdown('<p class="setup-step">VISÃO ANALÍTICA CFO.</p>', unsafe_allow_html=True)
     
-    # 1. CARREGAR GASTOS REAIS COM FORÇA DE TIPAGEM
-    gastos_reais = 0.0
+    # 1. PROCESSAMENTO DE GASTOS
+    gastos_totais_mes = 0.0
+    gastos_hoje = 0.0
+    data_hoje = datetime.now().strftime("%d/%m/%Y")
+    
     try:
-        lancamentos_df = conn.read(worksheet="Lancamentos", ttl=0)
-        if not lancamentos_df.empty:
-            # Força a conversão para numérico para evitar erros de soma
-            lancamentos_df['valor'] = pd.to_numeric(lancamentos_df['valor'], errors='coerce')
-            gastos_reais = lancamentos_df['valor'].sum()
+        df_l = conn.read(worksheet="Lancamentos", ttl=0)
+        if not df_l.empty:
+            df_l['valor'] = pd.to_numeric(df_l['valor'], errors='coerce')
+            gastos_totais_mes = df_l['valor'].sum()
+            # Filtra apenas o que foi gasto hoje
+            gastos_hoje = df_l[df_l['data'].str.contains(data_hoje)]['valor'].sum()
     except: pass
 
-    # 2. CÁLCULO DE FLUXO (ABATENDO GASTOS REAIS)
-    dias_no_mes = 30
-    dia_atual = datetime.now().day
-    dias_restantes = max(dias_no_mes - dia_atual, 1)
+    # 2. CÁLCULOS DE PRAZO
+    hoje = datetime.now()
+    ultimo_dia = 31 # Simplificado para o modelo
+    dias_restantes = max(ultimo_dia - hoje.day, 1)
 
+    # 3. GRÁFICO DE PROJEÇÃO
     dias = np.arange(1, 32)
     saldo_diario = []
-    # O caixa atual já nasce subtraindo o que você já gastou este mês
-    current_cash = st.session_state.opening_balance - st.session_state.investments - st.session_state.dreams - gastos_reais
-    
+    current_cash = st.session_state.opening_balance - st.session_state.investments - st.session_state.dreams - gastos_totais_mes
     for dia in dias:
         for inc in st.session_state.incomes:
             if inc['date'] == dia: current_cash += inc['val']
@@ -103,7 +104,6 @@ if st.session_state.step == 4:
             if exp['date'] == dia: current_cash -= exp['val']
         saldo_diario.append(current_cash)
 
-    # 3. GRÁFICO ATUALIZADO
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=dias, y=[v/1000 for v in saldo_diario], mode='lines', line=dict(color='black', width=3),
                              hovertemplate='Dia %{x}<br>Saldo: %{customdata}<extra></extra>',
@@ -114,24 +114,29 @@ if st.session_state.step == 4:
                       showlegend=False)
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # 4. KPIs REAIS
+    # 4. KPIS INTELIGENTES
     t_in = sum(i['val'] for i in st.session_state.incomes)
     t_out = sum(e['val'] for e in st.session_state.expenses)
     
-    # O Capital Operacional agora mostra estritamente o que resta "na mão"
-    total_operacional = (st.session_state.opening_balance - st.session_state.strategic_reserve + t_in) - t_out - st.session_state.investments - st.session_state.dreams
-    livre_agora = total_operacional - gastos_reais
+    # Capital que resta para o mês todo
+    livre_mes = (st.session_state.opening_balance - st.session_state.strategic_reserve + t_in) - t_out - st.session_state.investments - st.session_state.dreams - gastos_totais_mes
     
+    # Meta Diária Teórica (O que você DEVERIA gastar por dia)
+    meta_diaria_ideal = (livre_mes + gastos_hoje) / (dias_restantes + 1)
+    
+    # Cota Restante para HOJE (Meta - O que já foi)
+    cota_restante_hoje = meta_diaria_ideal - gastos_hoje
+
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown(f'<div class="card"><p class="metric-label">Operacional Restante</p><p class="metric-value">{format_br(livre_agora)}</p></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="card"><p class="metric-label">Operacional Restante</p><p class="metric-value">{format_br(livre_mes)}</p></div>', unsafe_allow_html=True)
     with col2:
-        # Cota Diária agora divide o que SOBROU pelos dias que FALTAM
-        st.markdown(f'<div class="card"><p class="metric-label">Cota Diária (Hoje)</p><p class="metric-value">{format_br(max(livre_agora/dias_restantes, 0))[:-3]}</p></div>', unsafe_allow_html=True)
+        # A cota agora diminui conforme você gasta no mesmo dia
+        st.markdown(f'<div class="card"><p class="metric-label">Cota Restante (Hoje)</p><p class="metric-value">{format_br(cota_restante_hoje)}</p></div>', unsafe_allow_html=True)
 
-    st.markdown(f'<p style="color:#888; font-size:11px; margin-top:-10px;">Gasto acumulado no mês: {format_br(gastos_reais)}</p>', unsafe_allow_html=True)
+    st.markdown(f'<p style="color:#888; font-size:11px; margin-top:-10px;">Você já gastou {format_br(gastos_hoje)} hoje de uma meta de {format_br(meta_diaria_ideal)}</p>', unsafe_allow_html=True)
 
-    # 5. LANÇAMENTO (DAILY LOG)
+    # 5. REGISTRO
     with st.expander("📝 REGISTRAR NOVO GASTO", expanded=False):
         c_l1, c_l2 = st.columns([2, 1])
         l_desc = c_l1.text_input("DESCRIÇÃO", placeholder="Ex: Jantar")
