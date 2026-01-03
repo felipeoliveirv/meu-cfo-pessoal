@@ -3,10 +3,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 
-# --- ESTÉTICA PERFORMANCE UTILITY (247 / SATISFY / APPLE) ---
-st.set_page_config(page_title="CFO Pessoal v11", layout="centered")
+# --- ESTÉTICA PERFORMANCE TERMINAL (Apple/Satisfy/247) ---
+st.set_page_config(page_title="CFO Pessoal v13", layout="centered")
 
+# Função Mestra de Formatação (Padrão: 13.000,00)
 def format_br(val):
+    if val is None: return "R$ 0,00"
+    # Garante o formato com ponto no milhar e vírgula no decimal
     return f"R$ {val:,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
 
 st.markdown("""
@@ -19,16 +22,14 @@ st.markdown("""
         color: #000; 
     }
 
-    /* Botão Principal: Estética Brutalista Clean */
+    /* Botão Principal Estilo Performance-Wear */
     .stButton>button { 
         width: 100%; background-color: #000 !important; color: #FFF !important; 
         border-radius: 0px; padding: 14px; font-weight: 800; border: none; 
         text-transform: uppercase; letter-spacing: 3px; font-size: 10px;
-        transition: 0.2s;
     }
-    .stButton>button:hover { background-color: #333 !important; }
 
-    /* Inputs: Ghost UI Style */
+    /* Inputs Minimalistas */
     .stNumberInput input, .stTextInput input {
         border: none !important;
         border-bottom: 1px solid #000 !important;
@@ -36,41 +37,42 @@ st.markdown("""
         background-color: transparent !important;
         font-size: 18px !important;
         font-weight: 600 !important;
-        padding-left: 0px !important;
     }
     
-    /* Typography Refinement */
-    .setup-title { font-size: 20px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; display: inline-block; }
-    .metric-label { font-size: 9px; color: #999; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; margin-bottom: 2px; }
-    .metric-value { font-size: 34px; font-weight: 800; margin: 0; letter-spacing: -2px; line-height: 1; }
+    /* Tipografia de Alta Performance */
+    .setup-title { font-size: 18px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; display: inline-block; }
+    .metric-label { font-size: 9px; color: #999; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; }
+    .metric-value { font-size: 32px; font-weight: 800; margin: 0; letter-spacing: -2px; line-height: 1; }
     
-    /* Dashboard Cards */
+    /* Cards do Dashboard */
     .card { padding: 25px 0; border-bottom: 1px solid #EEE; margin-bottom: 10px; }
 
-    /* Hide Streamlit default elements */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+    /* Esconder Elementos de Sistema */
+    #MainMenu, footer, header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- ENGINE & STATE ---
+# --- ENGINE & ESTADO ---
 keys = ['step', 'opening_balance', 'strategic_reserve', 'incomes', 'expenses', 'investments', 'dreams']
 for key in keys:
     if key not in st.session_state:
         st.session_state[key] = [] if key in ['incomes', 'expenses'] else (0 if key == 'step' else 0.0)
 
-# --- NAV & SCREENS ---
+# --- FLUXO DE CONFIGURAÇÃO ---
 if st.session_state.step == 0:
     st.markdown('<p class="setup-title">01_Liquidez</p>', unsafe_allow_html=True)
-    val_total = st.number_input("SALDO ATUAL BRUTO", min_value=0.0, format="%.2f", help="Total em custódia hoje.")
-    val_reserva = st.number_input("RESERVA ESTRATÉGICA", min_value=0.0, format="%.2f", help="Patrimônio blindado.")
+    val_total = st.number_input("SALDO ATUAL BRUTO", min_value=0.0, format="%.2f", help="Total disponível hoje.")
+    val_reserva = st.number_input("RESERVA ESTRATÉGICA", min_value=0.0, format="%.2f", help="Valor blindado.")
     if st.button("CONFIRM_STRATEGY"):
         st.session_state.opening_balance, st.session_state.strategic_reserve, st.session_state.step = val_total, val_reserva, 1
         st.rerun()
 
 elif st.session_state.step == 1:
-    st.markdown('<p class="setup-title">02_Cash_In</p>', unsafe_allow_html=True)
+    total_inc_val = sum(i['val'] for i in st.session_state.incomes)
+    c1, c2 = st.columns([2, 1])
+    c1.markdown('<p class="setup-title">02_Cash_In</p>', unsafe_allow_html=True)
+    c2.markdown(f'<p style="text-align:right; font-weight:800; font-size:14px;">{format_br(total_inc_val)}</p>', unsafe_allow_html=True)
+    
     col1, col2, col3 = st.columns([2, 1, 1])
     desc = col1.text_input("ORIGEM")
     val = col2.number_input("VALOR", format="%.2f")
@@ -80,11 +82,14 @@ elif st.session_state.step == 1:
     for idx, i in enumerate(st.session_state.incomes):
         cl1, cl2 = st.columns([0.9, 0.1]); cl1.markdown(f"**{i['desc']}** • {format_br(i['val'])} (Dia {i['date']})")
         if cl2.button("✕", key=f"d_inc_{idx}"): st.session_state.incomes.pop(idx); st.rerun()
-    if len(st.session_state.incomes) > 0:
-        if st.button("NEXT_FIXED_COSTS"): st.session_state.step = 2; st.rerun()
+    if len(st.session_state.incomes) > 0 and st.button("NEXT_FIXED_COSTS"): st.session_state.step = 2; st.rerun()
 
 elif st.session_state.step == 2:
-    st.markdown('<p class="setup-title">03_Fixed_Costs</p>', unsafe_allow_html=True)
+    total_exp_val = sum(e['val'] for e in st.session_state.expenses)
+    c1, c2 = st.columns([2, 1])
+    c1.markdown('<p class="setup-title">03_Fixed_Costs</p>', unsafe_allow_html=True)
+    c2.markdown(f'<p style="text-align:right; font-weight:800; font-size:14px;">{format_br(total_exp_val)}</p>', unsafe_allow_html=True)
+    
     col1, col2, col3 = st.columns([2, 1, 1])
     desc = col1.text_input("ITEM")
     val = col2.number_input("VALOR", format="%.2f")
@@ -94,17 +99,16 @@ elif st.session_state.step == 2:
     for idx, e in enumerate(st.session_state.expenses):
         cl1, cl2 = st.columns([0.9, 0.1]); cl1.markdown(f"**{e['desc']}** • {format_br(e['val'])} (Dia {e['date']})")
         if cl2.button("✕", key=f"d_exp_{idx}"): st.session_state.expenses.pop(idx); st.rerun()
-    if len(st.session_state.expenses) > 0:
-        if st.button("NEXT_ALLOCATION"): st.session_state.step = 3; st.rerun()
+    if len(st.session_state.expenses) > 0 and st.button("NEXT_ALLOCATION"): st.session_state.step = 3; st.rerun()
 
 elif st.session_state.step == 3:
     st.markdown('<p class="setup-title">04_Allocation</p>', unsafe_allow_html=True)
-    inv = st.number_input("INVESTIMENTOS MENSAL", min_value=0.0)
-    drm = st.number_input("SONHOS / LIFESTYLE", min_value=0.0)
+    inv = st.number_input("INVESTIMENTOS MENSAL", min_value=0.0, format="%.2f")
+    drm = st.number_input("SONHOS / LIFESTYLE", min_value=0.0, format="%.2f")
     if st.button("LAUNCH_DASHBOARD"):
         st.session_state.investments, st.session_state.dreams, st.session_state.step = inv, drm, 4; st.rerun()
 
-# --- FINAL DASHBOARD ANALYTICS ---
+# --- DASHBOARD ANALYTICS ---
 elif st.session_state.step == 4:
     st.markdown('<p class="setup-title">CFO_Insight</p>', unsafe_allow_html=True)
     
@@ -119,7 +123,7 @@ elif st.session_state.step == 4:
             if exp['date'] == dia: current_cash -= exp['val']
         saldo_diario.append(current_cash)
 
-    # GRÁFICO PERFORMANCE (ESTILO SATISFY)
+    # Gráfico de Performance (Limpo e Profissional)
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=dias, y=[v/1000 for v in saldo_diario], mode='lines', 
                              line=dict(color='black', width=3),
@@ -130,14 +134,14 @@ elif st.session_state.step == 4:
     fig.add_hline(y=reserva_k, line_dash="dash", line_color="#CCC", line_width=1)
     
     fig.update_layout(
-        plot_bgcolor='white', paper_bgcolor='white', height=250, margin=dict(l=0, r=0, t=0, b=0),
+        plot_bgcolor='white', paper_bgcolor='white', height=250, margin=dict(l=0, r=0, t=10, b=0),
         xaxis=dict(showgrid=False, tickfont=dict(size=9, color='#AAA')),
         yaxis=dict(gridcolor='#F9F9F9', ticksuffix='k', tickformat='.0f', tickfont=dict(size=9, color='#AAA')),
         showlegend=False
     )
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # INDICADORES ALPHA
+    # Métricas Heróis
     total_in = sum(i['val'] for i in st.session_state.incomes)
     total_out = sum(e['val'] for e in st.session_state.expenses)
     livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + total_in) - total_out - st.session_state.investments - st.session_state.dreams
@@ -148,15 +152,4 @@ elif st.session_state.step == 4:
     with st.expander("DETAILS_AND_AUDIT", expanded=False):
         audit_html = f"""
         <div style="font-size: 11px; color: #666; font-family: 'Inter'; letter-spacing: 0.5px;">
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 10px 0;"><span>(+) SALDO INICIAL</span><span>{format_br(st.session_state.opening_balance)}</span></div>
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 10px 0;"><span>(-) RESERVA BLINDADA</span><span>{format_br(st.session_state.strategic_reserve)}</span></div>
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 10px 0;"><span>(+) TOTAL RECEITAS</span><span>{format_br(total_inc)}</span></div>
-            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 10px 0;"><span>(-) CUSTOS FIXOS</span><span>{format_br(total_out)}</span></div>
-            <div style="display: flex; justify-content: space-between; padding: 10px 0; color: #000; font-weight: 800;"><span>NET_LIQUIDITY</span><span>{format_br(livre)}</span></div>
-        </div>
-        """
-        st.markdown(audit_html, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("RESET_STRATEGY"):
-        st.session_state.step = 0; st.rerun()
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>(+) SALDO INICIAL</span><span>{format_br(st.session_state.opening_
