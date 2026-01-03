@@ -6,8 +6,8 @@ import time
 import requests
 from streamlit_lottie import st_lottie
 
-# --- ESTÉTICA PERFORMANCE TERMINAL (RUNWAY / APPLE / SATISFY) ---
-st.set_page_config(page_title="RUNWAY | CFO Pessoal", layout="centered")
+# --- ESTÉTICA PERFORMANCE TERMINAL (CFO. / APPLE / SATISFY) ---
+st.set_page_config(page_title="CFO. | Estratégia Pessoal", layout="centered")
 
 # Função Segura para carregar animações
 def load_lottieurl(url: str):
@@ -18,7 +18,7 @@ def load_lottieurl(url: str):
     except:
         return None
 
-# Carregamento sutil de checkmark
+# Carregamento sutil de micro-interação
 lottie_success = load_lottieurl("https://lottie.host/5a2d67a1-94a3-4886-905c-5912389d4d03/GjX1Xl9T8y.json")
 
 # Função de Formatação Brasileira (Ex: 13.000,00)
@@ -36,6 +36,7 @@ st.markdown("""
         color: #000; 
     }
 
+    /* Botão Principal Estilo CFO. */
     .stButton>button { 
         width: 100%; background-color: #000 !important; color: #FFF !important; 
         border-radius: 0px; padding: 14px; font-weight: 800; border: none; 
@@ -44,6 +45,7 @@ st.markdown("""
     }
     .stButton>button:hover { background-color: #333 !important; }
 
+    /* Inputs Minimalistas */
     .stNumberInput input, .stTextInput input {
         border: none !important;
         border-bottom: 1px solid #000 !important;
@@ -53,16 +55,18 @@ st.markdown("""
         font-weight: 600 !important;
     }
     
-    .brand-header { font-size: 24px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 40px; border-bottom: 3px solid #000; display: inline-block; }
+    .brand-header { font-size: 24px; font-weight: 800; letter-spacing: 6px; text-transform: uppercase; margin-bottom: 40px; border-bottom: 3px solid #000; display: inline-block; }
     .setup-step { font-size: 10px; color: #888; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; }
     .metric-label { font-size: 9px; color: #999; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; }
     .metric-value { font-size: 32px; font-weight: 800; margin: 0; letter-spacing: -2px; line-height: 1; }
     .card { padding: 25px 0; border-bottom: 1px solid #EEE; margin-bottom: 10px; }
+    
+    /* Limpeza de Interface */
     #MainMenu, footer, header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- ENGINE & ESTADO ---
+# --- MOTOR DE ESTADO ---
 keys = ['step', 'opening_balance', 'strategic_reserve', 'incomes', 'expenses', 'investments', 'dreams', 'show_anim']
 for key in keys:
     if key not in st.session_state:
@@ -71,22 +75,22 @@ for key in keys:
         elif key == 'show_anim': st.session_state[key] = False
         else: st.session_state[key] = 0.0
 
-# --- HEADER ---
-st.markdown('<p class="brand-header">RUNWAY</p>', unsafe_allow_html=True)
+# --- BRANDING ---
+st.markdown('<p class="brand-header">CFO.</p>', unsafe_allow_html=True)
 
-# --- MICRO-ANIMAÇÃO (CONTROLE DE ERRO) ---
+# --- ANIMAÇÃO DE FEEDBACK ---
 if st.session_state.show_anim:
     if lottie_success:
-        st_lottie(lottie_success, height=80, speed=1.5, key="success_anim")
+        st_lottie(lottie_success, height=80, speed=1.8, key="success_anim")
         time.sleep(0.8)
     st.session_state.show_anim = False
     st.rerun()
 
-# --- ETAPAS ---
+# --- ETAPAS DO ONBOARDING ---
 if st.session_state.step == 0:
-    st.markdown('<p class="setup-step">01_CONFIGURAÇÃO DE CAIXA</p>', unsafe_allow_html=True)
-    val_total = st.number_input("SALDO ATUAL EM CONTA", min_value=0.0, format="%.2f")
-    val_reserva = st.number_input("RESERVA ESTRATÉGICA", min_value=0.0, format="%.2f")
+    st.markdown('<p class="setup-step">01_DEFINIÇÃO DE LIQUIDEZ</p>', unsafe_allow_html=True)
+    val_total = st.number_input("SALDO TOTAL HOJE", min_value=0.0, format="%.2f")
+    val_reserva = st.number_input("RESERVA ESTRATÉGICA", min_value=0.0, format="%.2f", help="Patrimônio que não será gasto.")
     if st.button("CONFIRMAR ESTRATÉGIA"):
         st.session_state.opening_balance, st.session_state.strategic_reserve = val_total, val_reserva
         st.session_state.step = 1
@@ -96,7 +100,7 @@ if st.session_state.step == 0:
 elif st.session_state.step == 1:
     total_in = sum(i['val'] for i in st.session_state.incomes)
     c1, c2 = st.columns([2, 1])
-    c1.markdown('<p class="setup-step">02_ENTRADAS PREVISTAS</p>', unsafe_allow_html=True)
+    c1.markdown('<p class="setup-step">02_FLUXO DE ENTRADAS</p>', unsafe_allow_html=True)
     c2.markdown(f'<p style="text-align:right; font-weight:800; font-size:12px;">{format_br(total_in)}</p>', unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([2, 1, 1])
@@ -115,11 +119,11 @@ elif st.session_state.step == 1:
 elif st.session_state.step == 2:
     total_out = sum(e['val'] for e in st.session_state.expenses)
     c1, c2 = st.columns([2, 1])
-    c1.markdown('<p class="setup-step">03_CUSTOS OPERACIONAIS</p>', unsafe_allow_html=True)
+    c1.markdown('<p class="setup-step">03_CUSTOS FIXOS</p>', unsafe_allow_html=True)
     c2.markdown(f'<p style="text-align:right; font-weight:800; font-size:12px;">{format_br(total_out)}</p>', unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([2, 1, 1])
-    desc = col1.text_input("NOME DO CUSTO", placeholder="Ex: Aluguel")
+    desc = col1.text_input("ITEM", placeholder="Ex: Aluguel")
     val = col2.number_input("VALOR", format="%.2f")
     date = col3.number_input("DIA", 1, 31, 5)
     if st.button("ADICIONAR CUSTO"):
@@ -132,19 +136,20 @@ elif st.session_state.step == 2:
         st.session_state.step = 3; st.session_state.show_anim = True; st.rerun()
 
 elif st.session_state.step == 3:
-    st.markdown('<p class="setup-step">04_PROTEÇÃO E INVESTIMENTOS</p>', unsafe_allow_html=True)
-    inv = st.number_input("INVESTIMENTO MENSAL", min_value=0.0, format="%.2f")
+    st.markdown('<p class="setup-step">04_ALOCAÇÃO DE CAPITAL</p>', unsafe_allow_html=True)
+    inv = st.number_input("INVESTIMENTOS MENSAL", min_value=0.0, format="%.2f")
     drm = st.number_input("SONHOS / LIFESTYLE", min_value=0.0, format="%.2f")
-    if st.button("FINALIZAR ESTRATÉGIA"):
+    if st.button("FINALIZAR E GERAR DASHBOARD"):
         st.session_state.investments, st.session_state.dreams = inv, drm
         st.session_state.step = 4; st.session_state.show_anim = True; st.rerun()
 
-# --- DASHBOARD ---
+# --- DASHBOARD FINAL ---
 elif st.session_state.step == 4:
     st.markdown('<p class="setup-step">VISÃO ANALÍTICA CFO</p>', unsafe_allow_html=True)
     
     dias = np.arange(1, 32)
     saldo_diario = []
+    # Lógica de Fluxo
     current_cash = st.session_state.opening_balance - st.session_state.investments - st.session_state.dreams
     
     for dia in dias:
@@ -181,10 +186,10 @@ elif st.session_state.step == 4:
             <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>(-) RESERVA BLINDADA</span><span>{format_br(st.session_state.strategic_reserve)}</span></div>
             <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>(+) TOTAL RECEITAS</span><span>{format_br(t_in)}</span></div>
             <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>(-) CUSTOS FIXOS</span><span>{format_br(t_out)}</span></div>
-            <div style="display: flex; justify-content: space-between; padding: 12px 0; color: #000; font-weight: 800; border-top: 1px solid #000;"><span>LIQUIDEZ LÍQUIDA</span><span>{format_br(livre)}</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 10px 0; color: #000; font-weight: 800; border-top: 1px solid #000;"><span>LIQUIDEZ OPERACIONAL</span><span>{format_br(livre)}</span></div>
         </div>
         """
         st.markdown(audit_html, unsafe_allow_html=True)
 
-    if st.button("REINICIAR ESTRATÉGIA"):
+    if st.button("REDEFINIR ESTRATÉGIA"):
         st.session_state.step = 0; st.rerun()
