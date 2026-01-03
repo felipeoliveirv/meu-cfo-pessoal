@@ -49,7 +49,7 @@ st.markdown("""
     .brand-header { font-size: 24px; font-weight: 800; letter-spacing: 6px; text-transform: uppercase; margin-bottom: 40px; border-bottom: 3px solid #000; display: inline-block; }
     .setup-step { font-size: 10px; color: #888; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; }
     
-    /* REFINO DE MÉTRICAS - BREATHING ROOM */
+    /* REFINO DE MÉTRICAS - FOCO EM LEGIBILIDADE */
     .metric-label { 
         font-size: 10px; 
         color: #999; 
@@ -60,10 +60,11 @@ st.markdown("""
     .metric-value { 
         font-size: 42px; 
         font-weight: 800; 
-        margin-top: 12px; 
-        letter-spacing: -2.5px; 
-        line-height: 1; 
+        margin-top: 10px; 
+        letter-spacing: -1px; /* CORREÇÃO AQUI: Menos agressivo que -2.5px */
+        line-height: 1.1; 
         color: #000;
+        display: block;
     }
     .card { 
         padding: 40px 0; 
@@ -75,7 +76,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- ENGINE ---
+# --- MOTOR DE ESTADO ---
 keys = ['step', 'opening_balance', 'strategic_reserve', 'incomes', 'expenses', 'investments', 'dreams', 'show_anim']
 for key in keys:
     if key not in st.session_state:
