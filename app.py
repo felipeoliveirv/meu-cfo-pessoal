@@ -3,13 +3,12 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 
-# --- ESTÉTICA PERFORMANCE TERMINAL (Apple/Satisfy/247) ---
-st.set_page_config(page_title="CFO Pessoal v14", layout="centered")
+# --- ESTÉTICA PERFORMANCE TERMINAL (RUNWAY / APPLE / SATISFY) ---
+st.set_page_config(page_title="RUNWAY | CFO Pessoal", layout="centered")
 
-# Função Mestra de Formatação Brasileira (Ex: 13.000,00)
+# Função de Formatação Brasileira (Ex: 13.000,00)
 def format_br(val):
     if val is None: return "R$ 0,00"
-    # Formata com padrão americano e inverte separadores
     return "R$ {:,.2f}".format(val).replace(",", "v").replace(".", ",").replace("v", ".")
 
 st.markdown("""
@@ -22,14 +21,14 @@ st.markdown("""
         color: #000; 
     }
 
-    /* Botão Principal Estilo Performance */
+    /* Botão Principal: Minimalismo Brutalista */
     .stButton>button { 
         width: 100%; background-color: #000 !important; color: #FFF !important; 
         border-radius: 0px; padding: 14px; font-weight: 800; border: none; 
-        text-transform: uppercase; letter-spacing: 3px; font-size: 10px;
+        text-transform: uppercase; letter-spacing: 2px; font-size: 11px;
     }
 
-    /* Inputs Minimalistas com borda inferior apenas */
+    /* Inputs Estilo Ghost UI */
     .stNumberInput input, .stTextInput input {
         border: none !important;
         border-bottom: 1px solid #000 !important;
@@ -39,15 +38,15 @@ st.markdown("""
         font-weight: 600 !important;
     }
     
-    /* Tipografia de Dashboard Premium */
-    .setup-title { font-size: 18px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #000; display: inline-block; }
-    .metric-label { font-size: 9px; color: #999; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; }
+    /* Tipografia e Hierarquia */
+    .brand-header { font-size: 24px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 40px; border-bottom: 3px solid #000; display: inline-block; }
+    .setup-step { font-size: 10px; color: #888; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; }
     .metric-value { font-size: 32px; font-weight: 800; margin: 0; letter-spacing: -2px; line-height: 1; }
     
-    /* Cards de Visualização */
+    /* Cards do Dashboard */
     .card { padding: 25px 0; border-bottom: 1px solid #EEE; margin-bottom: 10px; }
 
-    /* Remoção de elementos desnecessários */
+    /* Remoção de elementos de sistema */
     #MainMenu, footer, header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
@@ -58,68 +57,71 @@ for key in keys:
     if key not in st.session_state:
         st.session_state[key] = [] if key in ['incomes', 'expenses'] else (0 if key == 'step' else 0.0)
 
+# --- HEADER DA MARCA ---
+st.markdown('<p class="brand-header">RUNWAY</p>', unsafe_allow_html=True)
+
 # --- FLUXO DE CONFIGURAÇÃO (ONBOARDING) ---
 if st.session_state.step == 0:
-    st.markdown('<p class="setup-title">01_Liquidez</p>', unsafe_allow_html=True)
-    val_total = st.number_input("SALDO ATUAL BRUTO", min_value=0.0, format="%.2f", help="Dinheiro disponível hoje.")
-    val_reserva = st.number_input("RESERVA ESTRATÉGICA", min_value=0.0, format="%.2f", help="Patrimônio blindado.")
-    if st.button("CONFIRM_STRATEGY"):
-        st.session_state.opening_balance = val_total
-        st.session_state.strategic_reserve = val_reserva
-        st.session_state.step = 1
+    st.markdown('<p class="setup-step">01_DEFINIÇÃO DE LIQUIDEZ</p>', unsafe_allow_html=True)
+    val_total = st.number_input("SALDO ATUAL EM CONTA", min_value=0.0, format="%.2f", help="Soma de todo o dinheiro disponível hoje.")
+    val_reserva = st.number_input("RESERVA ESTRATÉGICA", min_value=0.0, format="%.2f", help="Valor que você não quer gastar e deseja manter como reserva.")
+    if st.button("CONFIRMAR ESTRATÉGIA"):
+        st.session_state.opening_balance, st.session_state.strategic_reserve, st.session_state.step = val_total, val_reserva, 1
         st.rerun()
 
 elif st.session_state.step == 1:
     total_in_now = sum(i['val'] for i in st.session_state.incomes)
     c1, c2 = st.columns([2, 1])
-    c1.markdown('<p class="setup-title">02_Cash_In</p>', unsafe_allow_html=True)
-    c2.markdown(f'<p style="text-align:right; font-weight:800; font-size:14px;">TOTAL: {format_br(total_in_now)}</p>', unsafe_allow_html=True)
+    c1.markdown('<p class="setup-step">02_ENTRADAS PREVISTAS</p>', unsafe_allow_html=True)
+    c2.markdown(f'<p style="text-align:right; font-weight:800; font-size:12px;">TOTAL: {format_br(total_in_now)}</p>', unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([2, 1, 1])
-    desc = col1.text_input("ORIGEM")
+    desc = col1.text_input("NOME DA RECEITA", placeholder="Ex: Salário")
     val = col2.number_input("VALOR", format="%.2f")
     date = col3.number_input("DIA", 1, 31, 15)
-    if st.button("LOG_INCOME"):
+    if st.button("ADICIONAR RECEITA"):
         st.session_state.incomes.append({"desc": desc, "val": val, "date": date})
         st.rerun()
     for idx, i in enumerate(st.session_state.incomes):
         cl1, cl2 = st.columns([0.9, 0.1]); cl1.markdown(f"**{i['desc']}** • {format_br(i['val'])} (Dia {i['date']})")
         if cl2.button("✕", key=f"d_inc_{idx}"): st.session_state.incomes.pop(idx); st.rerun()
-    if len(st.session_state.incomes) > 0 and st.button("NEXT_FIXED_COSTS"): st.session_state.step = 2; st.rerun()
+    if len(st.session_state.incomes) > 0 and st.button("AVANÇAR PARA CUSTOS FIXOS"):
+        st.session_state.step = 2; st.rerun()
 
 elif st.session_state.step == 2:
     total_out_now = sum(e['val'] for e in st.session_state.expenses)
     c1, c2 = st.columns([2, 1])
-    c1.markdown('<p class="setup-title">03_Fixed_Costs</p>', unsafe_allow_html=True)
-    c2.markdown(f'<p style="text-align:right; font-weight:800; font-size:14px;">TOTAL: {format_br(total_out_now)}</p>', unsafe_allow_html=True)
+    c1.markdown('<p class="setup-step">03_CUSTOS FIXOS</p>', unsafe_allow_html=True)
+    c2.markdown(f'<p style="text-align:right; font-weight:800; font-size:12px;">TOTAL: {format_br(total_out_now)}</p>', unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([2, 1, 1])
-    desc = col1.text_input("ITEM")
+    desc = col1.text_input("NOME DO CUSTO", placeholder="Ex: Aluguel")
     val = col2.number_input("VALOR", format="%.2f")
     date = col3.number_input("DIA", 1, 31, 5)
-    if st.button("LOG_EXPENSE"):
+    if st.button("ADICIONAR CUSTO"):
         st.session_state.expenses.append({"desc": desc, "val": val, "date": date})
         st.rerun()
     for idx, e in enumerate(st.session_state.expenses):
         cl1, cl2 = st.columns([0.9, 0.1]); cl1.markdown(f"**{e['desc']}** • {format_br(e['val'])} (Dia {e['date']})")
         if cl2.button("✕", key=f"d_exp_{idx}"): st.session_state.expenses.pop(idx); st.rerun()
-    if len(st.session_state.expenses) > 0 and st.button("NEXT_ALLOCATION"): st.session_state.step = 3; st.rerun()
+    if len(st.session_state.expenses) > 0 and st.button("AVANÇAR PARA ALOCAÇÃO"):
+        st.session_state.step = 3; st.rerun()
 
 elif st.session_state.step == 3:
-    st.markdown('<p class="setup-title">04_Allocation</p>', unsafe_allow_html=True)
-    inv = st.number_input("INVESTIMENTOS MENSAL", min_value=0.0, format="%.2f")
+    st.markdown('<p class="setup-step">04_ALOCAÇÃO E RESERVAS</p>', unsafe_allow_html=True)
+    inv = st.number_input("INVESTIMENTO MENSAL", min_value=0.0, format="%.2f")
     drm = st.number_input("SONHOS / LIFESTYLE", min_value=0.0, format="%.2f")
-    if st.button("LAUNCH_DASHBOARD"):
+    if st.button("GERAR DASHBOARD"):
         st.session_state.investments, st.session_state.dreams, st.session_state.step = inv, drm, 4
         st.rerun()
 
 # --- DASHBOARD ANALYTICS ---
 elif st.session_state.step == 4:
-    st.markdown('<p class="setup-title">CFO_Insight</p>', unsafe_allow_html=True)
+    st.markdown('<p class="setup-step">VISÃO GERAL DO CFO</p>', unsafe_allow_html=True)
     
     dias = np.arange(1, 32)
     saldo_diario = []
-    # Lógica de Fluxo de Caixa
+    # Lógica de Caixa
     current_cash = st.session_state.opening_balance - st.session_state.investments - st.session_state.dreams
     
     for dia in dias:
@@ -129,7 +131,7 @@ elif st.session_state.step == 4:
             if exp['date'] == dia: current_cash -= exp['val']
         saldo_diario.append(current_cash)
 
-    # Gráfico de Performance (Limpo)
+    # Gráfico de Projeção (Limpo)
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=dias, y=[v/1000 for v in saldo_diario], mode='lines', 
                              line=dict(color='black', width=3),
@@ -147,7 +149,7 @@ elif st.session_state.step == 4:
     )
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # Métricas Heróis
+    # Métricas Principais
     total_in = sum(i['val'] for i in st.session_state.incomes)
     total_out = sum(e['val'] for e in st.session_state.expenses)
     livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + total_in) - total_out - st.session_state.investments - st.session_state.dreams
@@ -155,19 +157,18 @@ elif st.session_state.step == 4:
     st.markdown(f'<div class="card"><p class="metric-label">Capital Operacional</p><p class="metric-value">{format_br(livre)}</p></div>', unsafe_allow_html=True)
     st.markdown(f'<div class="card"><p class="metric-label">Cota Diária</p><p class="metric-value">{format_br(max(livre/30, 0))[:-3]}</p></div>', unsafe_allow_html=True)
 
-    with st.expander("DETAILS_AND_AUDIT", expanded=False):
+    with st.expander("DETALHAMENTO E AUDITORIA", expanded=False):
         audit_html = f"""
         <div style="font-size: 11px; color: #666; font-family: 'Inter'; letter-spacing: 0.5px;">
             <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>(+) SALDO INICIAL</span><span>{format_br(st.session_state.opening_balance)}</span></div>
             <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>(-) RESERVA BLINDADA</span><span>{format_br(st.session_state.strategic_reserve)}</span></div>
             <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>(+) TOTAL RECEITAS</span><span>{format_br(total_in)}</span></div>
             <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>(-) CUSTOS FIXOS</span><span>{format_br(total_out)}</span></div>
-            <div style="display: flex; justify-content: space-between; padding: 12px 0; color: #000; font-weight: 800; border-top: 1px solid #000;"><span>NET_LIQUIDITY</span><span>{format_br(livre)}</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 0; color: #000; font-weight: 800; border-top: 1px solid #000;"><span>LIQUIDEZ LÍQUIDA</span><span>{format_br(livre)}</span></div>
         </div>
         """
         st.markdown(audit_html, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("RESET_STRATEGY"):
-        st.session_state.step = 0
-        st.rerun()
+    if st.button("REINICIAR ESTRATÉGIA"):
+        st.session_state.step = 0; st.rerun()
