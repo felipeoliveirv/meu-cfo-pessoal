@@ -3,69 +3,54 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 
-# --- ESTÉTICA CFO PERFORMANCE ---
-st.set_page_config(page_title="CFO Pessoal v6", layout="centered")
+# --- ESTÉTICA PERFORMANCE TERMINAL (Apple/Satisfy/247) ---
+st.set_page_config(page_title="CFO Pessoal v7", layout="centered")
 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #FFFFFF; color: #000000; }
-    .stButton>button { width: 100%; background-color: #000000 !important; color: #FFFFFF !important; border-radius: 4px; padding: 12px; font-weight: 600; border: none; margin-top: 10px; }
-    .setup-title { font-size: 28px; font-weight: 800; letter-spacing: -1.2px; text-transform: uppercase; margin: 0; }
-    .total-badge { font-size: 22px; font-weight: 800; color: #000; text-align: right; }
-    .setup-subtitle { font-size: 13px; color: #888; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px; }
-    .card { background-color: #FBFBFB; padding: 20px; border-radius: 12px; border: 1px solid #F0F0F0; margin-bottom: 15px; }
-    .help-box { background-color: #F0F2F6; padding: 15px; border-radius: 8px; font-size: 13px; color: #444; margin-bottom: 20px; border-left: 4px solid #000; }
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #FFFFFF; color: #000; }
+    .stButton>button { width: 100%; background-color: #000 !important; color: #FFF !important; border-radius: 4px; padding: 12px; font-weight: 600; border: none; }
+    .setup-title { font-size: 26px; font-weight: 800; letter-spacing: -1.2px; text-transform: uppercase; margin: 0; }
+    .total-badge { font-size: 20px; font-weight: 800; color: #000; text-align: right; }
+    .card { background-color: #FBFBFB; padding: 20px; border-radius: 12px; border: 1px solid #F0F0F0; }
+    .metric-label { font-size: 10px; color: #888; letter-spacing: 1px; text-transform: uppercase; }
+    .metric-value { font-size: 32px; font-weight: 800; margin: 0; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- ESTADO DO APP ---
-if 'step' not in st.session_state: st.session_state.step = 0
-if 'opening_balance' not in st.session_state: st.session_state.opening_balance = 0.0
-if 'strategic_reserve' not in st.session_state: st.session_state.strategic_reserve = 0.0
-if 'incomes' not in st.session_state: st.session_state.incomes = []
-if 'expenses' not in st.session_state: st.session_state.expenses = []
-if 'investments' not in st.session_state: st.session_state.investments = 0.0
-if 'dreams' not in st.session_state: st.session_state.dreams = 0.0
+for key in ['step', 'opening_balance', 'strategic_reserve', 'incomes', 'expenses', 'investments', 'dreams']:
+    if key not in st.session_state:
+        if key == 'step': st.session_state[key] = 0
+        elif key in ['incomes', 'expenses']: st.session_state[key] = []
+        else: st.session_state[key] = 0.0
 
 # --- FLUXO ONBOARDING ---
 
-# PASSO 0: LIQUIDEZ E RESERVA
+# PASSO 0: SALDO E RESERVA
 if st.session_state.step == 0:
-    st.markdown('<p class="setup-title">Liquidez de Partida</p>', unsafe_allow_html=True)
-    st.markdown('<p class="setup-subtitle">Onde o jogo começa</p>', unsafe_allow_html=True)
+    st.markdown('<p class="setup-title">Liquidez Inicial</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#888; font-size:13px; margin-bottom:20px;">DEFINA O SEU PONTO DE PARTIDA</p>', unsafe_allow_html=True)
     
-    with st.expander("💡 O que é isso?"):
-        st.markdown("""
-        **Saldo Total:** É todo o dinheiro que você tem disponível agora em todas as suas contas.
-        
-        **Reserva Intocável:** Pense nisso como o seu 'escudo'. É o dinheiro que você não quer gastar este mês de jeito nenhum (sua economia/emergência). O app vai "esconder" esse valor da sua cota diária para garantir que ele continue crescendo.
-        """)
+    with st.expander("💡 ENTENDA A ESTRATÉGIA"):
+        st.write("**Saldo Total:** O capital bruto disponível hoje. \n\n**Reserva:** O valor que você deseja 'blindar'. O app não contará esse valor para seus gastos diários, protegendo seu patrimônio.")
 
-    val_total = st.number_input("Saldo Total em Conta (R$)", min_value=0.0, step=500.0, format="%.2f", help="A soma de todas as suas contas bancárias e carteira.")
-    val_reserva = st.number_input("Reserva Intocável (R$)", min_value=0.0, step=500.0, format="%.2f", help="Aquele dinheiro que você está guardando e não quer tocar.")
+    val_total = st.number_input("Saldo Bruto em Conta (R$)", min_value=0.0, step=500.0, format="%.2f")
+    val_reserva = st.number_input("Reserva Estratégica (R$)", min_value=0.0, step=500.0, format="%.2f")
     
-    if st.button("DEFINIR ESTRATÉGIA"):
+    if st.button("PRÓXIMO: ENTRADAS"):
         st.session_state.opening_balance = val_total
         st.session_state.strategic_reserve = val_reserva
-        st.session_state.step = 1
-        st.rerun()
+        st.session_state.step = 1; st.rerun()
 
-# PASSO 1: RECEITAS
+# PASSO 1: CASH-IN
 elif st.session_state.step == 1:
-    total_inc_now = sum(i['val'] for i in st.session_state.incomes)
-    col_t1, col_t2 = st.columns([1.5, 1])
-    col_t1.markdown('<p class="setup-title">Cash-In</p>', unsafe_allow_html=True)
-    col_t2.markdown(f'<p class="total-badge">R$ {total_inc_now:,.2f}</p>', unsafe_allow_html=True)
+    total_inc = sum(i['val'] for i in st.session_state.incomes)
+    c1, c2 = st.columns([1.5, 1])
+    c1.markdown('<p class="setup-title">Cash-In</p>', unsafe_allow_html=True)
+    c2.markdown(f'<p class="total-badge">{total_inc/1000:.1f}k</p>', unsafe_allow_html=True)
     
-    st.markdown('<p class="setup-subtitle">Fluxo de Entradas</p>', unsafe_allow_html=True)
-    
-    with st.expander("💡 Como lançar?"):
-        st.markdown("""
-        Aqui você lança tudo o que espera receber este mês. Salários, bônus, freelas. 
-        **Dica de CFO:** Colocar a data correta ajuda o gráfico a mostrar quando você terá mais "fôlego" no mês.
-        """)
-
     col1, col2, col3 = st.columns([2, 1, 1])
     desc = col1.text_input("Origem", placeholder="Ex: Salário", key="inc_desc")
     val = col2.number_input("Valor", min_value=0.0, step=100.0, key="inc_val")
@@ -75,11 +60,10 @@ elif st.session_state.step == 1:
         st.session_state.incomes.append({"desc": desc, "val": val, "date": date})
         st.rerun()
     
-    st.markdown("---")
     for idx, i in enumerate(st.session_state.incomes):
-        c1, c2 = st.columns([0.9, 0.1])
-        c1.text(f"✓ {i['desc']}: R$ {i['val']:.2f} (Dia {i['date']})")
-        if c2.button("✕", key=f"del_inc_{idx}"):
+        cl1, cl2 = st.columns([0.9, 0.1])
+        cl1.text(f"✓ {i['desc']}: R$ {i['val']:.2f} (Dia {i['date']})")
+        if cl2.button("✕", key=f"d_inc_{idx}"):
             st.session_state.incomes.pop(idx); st.rerun()
 
     if len(st.session_state.incomes) > 0 and st.button("PRÓXIMO: CUSTOS FIXOS"):
@@ -87,21 +71,13 @@ elif st.session_state.step == 1:
 
 # PASSO 2: CUSTOS FIXOS
 elif st.session_state.step == 2:
-    total_exp_now = sum(e['val'] for e in st.session_state.expenses)
-    col_t1, col_t2 = st.columns([1.5, 1])
-    col_t1.markdown('<p class="setup-title">Fixed Outflows</p>', unsafe_allow_html=True)
-    col_t2.markdown(f'<p class="total-badge">R$ {total_exp_now:,.2f}</p>', unsafe_allow_html=True)
-    
-    st.markdown('<p class="setup-subtitle">O seu Custo de Vida</p>', unsafe_allow_html=True)
-
-    with st.expander("💡 O que considerar?"):
-        st.markdown("""
-        Estes são seus custos fixos: aluguel, internet, mensalidade da academia, planos de saúde. 
-        Tudo o que você sabe que **vai sair** da conta. Ao lançar a data de vencimento, o app avisa se o seu saldo vai ficar apertado antes do próximo salário.
-        """)
+    total_exp = sum(e['val'] for e in st.session_state.expenses)
+    c1, c2 = st.columns([1.5, 1])
+    c1.markdown('<p class="setup-title">Fixed Costs</p>', unsafe_allow_html=True)
+    c2.markdown(f'<p class="total-badge">{total_exp/1000:.1f}k</p>', unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([2, 1, 1])
-    desc = col1.text_input("Custo", placeholder="Ex: Aluguel", key="exp_desc")
+    desc = col1.text_input("Item", placeholder="Ex: Aluguel", key="exp_desc")
     val = col2.number_input("Valor", min_value=0.0, step=100.0, key="exp_val")
     date = col3.number_input("Dia", 1, 31, 5, key="exp_date")
     
@@ -109,42 +85,30 @@ elif st.session_state.step == 2:
         st.session_state.expenses.append({"desc": desc, "val": val, "date": date})
         st.rerun()
 
-    st.markdown("---")
     for idx, e in enumerate(st.session_state.expenses):
-        c1, c2 = st.columns([0.9, 0.1])
-        c1.text(f"✗ {e['desc']}: R$ {e['val']:.2f} (Dia {e['date']})")
-        if c2.button("✕", key=f"del_exp_{idx}"):
+        cl1, cl2 = st.columns([0.9, 0.1])
+        cl1.text(f"✗ {e['desc']}: R$ {e['val']:.2f} (Dia {e['date']})")
+        if cl2.button("✕", key=f"d_exp_{idx}"):
             st.session_state.expenses.pop(idx); st.rerun()
 
-    if len(st.session_state.expenses) > 0 and st.button("PRÓXIMO: PROVISÕES"):
+    if len(st.session_state.expenses) > 0 and st.button("PRÓXIMO: ALOCAÇÃO"):
         st.session_state.step = 3; st.rerun()
 
-# PASSO 3: ALOCAÇÃO DE CAPITAL
+# PASSO 3: ALOCAÇÃO FINAL
 elif st.session_state.step == 3:
     st.markdown('<p class="setup-title">Capital Allocation</p>', unsafe_allow_html=True)
-    st.markdown('<p class="setup-subtitle">Protegendo o amanhã</p>', unsafe_allow_html=True)
-
-    with st.expander("💡 Por que separar isso agora?"):
-        st.markdown("""
-        **Investimento:** Dinheiro para multiplicar seu patrimônio.
-        **Sonhos/Lifestyle:** Reserva para aquela viagem ou compra especial.
-        
-        O app retira esses valores da sua "Cota Diária" imediatamente. Assim, você só gasta o que realmente sobra, garantindo que suas metas sejam atingidas sem esforço.
-        """)
-
-    inv = st.number_input("Investir este mês (R$)", min_value=0.0, step=100.0, help="Valor que você vai tirar da conta para investir.")
-    drm = st.number_input("Reserva para Sonhos (R$)", min_value=0.0, step=100.0, help="Valor destinado a compras futuras ou lazer especial.")
-    
-    if st.button("GERAR DASHBOARD"):
+    inv = st.number_input("Aporte em Investimentos (R$)", min_value=0.0, step=100.0)
+    drm = st.number_input("Provisão para Sonhos (R$)", min_value=0.0, step=100.0)
+    if st.button("FINALIZAR DASHBOARD"):
         st.session_state.investments = inv
         st.session_state.dreams = drm
-        st.session_state.step = 4
-        st.rerun()
+        st.session_state.step = 4; st.rerun()
 
-# PASSO 4: DASHBOARD
+# PASSO 4: DASHBOARD ANALYTICS
 elif st.session_state.step == 4:
     st.markdown('<p class="setup-title">CFO Insight</p>', unsafe_allow_html=True)
     
+    # Lógica de Dados
     dias = np.arange(1, 32)
     saldo_diario = []
     current_cash = st.session_state.opening_balance - st.session_state.investments - st.session_state.dreams
@@ -156,24 +120,46 @@ elif st.session_state.step == 4:
             if exp['date'] == dia: current_cash -= exp['val']
         saldo_diario.append(current_cash)
 
+    # GRÁFICO PERFORMANCE (R$ k format)
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=dias, y=saldo_diario, mode='lines', line=dict(color='black', width=3)))
+    fig.add_trace(go.Scatter(x=dias, y=saldo_diario, mode='lines', line=dict(color='black', width=3),
+                             hovertemplate='Dia %{x}<br>Saldo: R$ %{y:,.2f}<extra></extra>'))
     fig.add_hline(y=st.session_state.strategic_reserve, line_dash="dash", line_color="#888")
-    fig.add_trace(go.Scatter(x=dias, y=[max(x, st.session_state.strategic_reserve) for x in saldo_diario], fill='tonexty', 
-                             fillcolor='rgba(0, 200, 100, 0.1)', line=dict(width=0), showlegend=False))
     
-    fig.update_layout(plot_bgcolor='white', paper_bgcolor='white', height=350, margin=dict(l=0, r=0, t=20, b=0), xaxis=dict(showgrid=False), yaxis=dict(gridcolor='#F0F0F0'))
+    # Área de Performance (Color Fill)
+    fig.add_trace(go.Scatter(x=dias, y=[max(x, st.session_state.strategic_reserve) for x in saldo_diario], fill='tonexty', 
+                             fillcolor='rgba(0, 200, 100, 0.05)', line=dict(width=0), showlegend=False))
+
+    fig.update_layout(
+        plot_bgcolor='white', paper_bgcolor='white', height=350, margin=dict(l=0, r=10, t=20, b=0),
+        xaxis=dict(showgrid=False, title="Timeline Mensal"),
+        yaxis=dict(gridcolor='#F0F0F0', ticksuffix='k', tickformat='.1f', 
+                   # Transforma 12000 em 12.0k
+                   tickvals=np.arange(min(saldo_diario)-1000, max(saldo_diario)+2000, 2000),
+                   ticktext=[f"{v/1000:.1f}k" for v in np.arange(min(saldo_diario)-1000, max(saldo_diario)+2000, 2000)])
+    )
     st.plotly_chart(fig, use_container_width=True)
 
+    # INDICADORES PRINCIPAIS
     total_in = sum(i['val'] for i in st.session_state.incomes)
     total_out = sum(e['val'] for e in st.session_state.expenses)
     livre_operacional = (st.session_state.opening_balance - st.session_state.strategic_reserve + total_in) - total_out - st.session_state.investments - st.session_state.dreams
     
     col_a, col_b = st.columns(2)
     with col_a:
-        st.markdown(f'<div class="card"><p style="font-size:10px; color:#888;">CAPITAL OPERACIONAL 💡</p><h3>R$ {livre_operacional:,.2f}</h3></div>', unsafe_allow_html=True, help="O 'dinheiro vivo' que sobrou para você passar o mês após todas as contas e reservas serem pagas.")
+        st.markdown(f'<div class="card"><p class="metric-label">Capital Operacional 💡</p><p class="metric-value">R$ {livre_operacional/1000:.1f}k</p></div>', unsafe_allow_html=True)
     with col_b:
-        st.markdown(f'<div class="card"><p style="font-size:10px; color:#888;">COTA DIÁRIA 💡</p><h3>R$ {max(livre_operacional/30, 0):,.2f}</h3></div>', unsafe_allow_html=True, help="Seu orçamento diário. Gaste até este valor para chegar ao fim do mês com suas metas intactas.")
+        st.markdown(f'<div class="card"><p class="metric-label">Cota Diária 💡</p><p class="metric-value">R$ {max(livre_operacional/30, 0):.0f}</p></div>', unsafe_allow_html=True)
 
-    if st.button("RECOMEÇAR"):
+    # DRILL-DOWN: COMPOSIÇÃO DOS NÚMEROS
+    with st.expander("🔍 VER DETALHAMENTO DO FLUXO (AUDIT)"):
+        st.write("Entenda como chegamos ao seu Capital Operacional:")
+        audit_data = {
+            "Item": ["(+) Saldo Bruto Inicial", "(-) Reserva Estratégica", "(+) Total de Entradas", "(-) Custos Fixos", "(-) Alocação (Invest/Sonhos)"],
+            "Valor": [f"R$ {st.session_state.opening_balance:,.2f}", f"- R$ {st.session_state.strategic_reserve:,.2f}", f"+ R$ {total_in:,.2f}", f"- R$ {total_out:,.2f}", f"- R$ {st.session_state.investments + st.session_state.dreams:,.2f}"]
+        }
+        st.table(pd.DataFrame(audit_data))
+        st.markdown(f"**RESULTADO FINAL: R$ {livre_operacional:,.2f}**")
+
+    if st.button("REINICIAR ESTRATÉGIA"):
         st.session_state.step = 0; st.rerun()
