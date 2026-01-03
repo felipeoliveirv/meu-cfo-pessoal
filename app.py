@@ -28,32 +28,13 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #FFFFFF; color: #000; }
-    
-    .stButton>button { 
-        width: 100%; background-color: #000 !important; color: #FFF !important; 
-        border-radius: 0px; padding: 14px; font-weight: 800; border: none; 
-        text-transform: uppercase; letter-spacing: 2px; font-size: 11px;
-    }
-
-    .back-arrow>div>button {
-        background-color: transparent !important; color: #000 !important;
-        border: none !important; font-size: 24px !important; padding: 0 !important;
-        width: 40px !important; height: 40px !important; line-height: 1 !important;
-    }
-
-    .stNumberInput input, .stTextInput input {
-        border: none !important; border-bottom: 1px solid #000 !important;
-        border-radius: 0px !important; font-size: 18px !important; font-weight: 600 !important;
-    }
-    
+    .stButton>button { width: 100%; background-color: #000 !important; color: #FFF !important; border-radius: 0px; padding: 14px; font-weight: 800; border: none; text-transform: uppercase; letter-spacing: 2px; font-size: 11px; }
+    .back-arrow>div>button { background-color: transparent !important; color: #000 !important; border: none !important; font-size: 24px !important; padding: 0 !important; width: 40px !important; height: 40px !important; line-height: 1 !important; }
+    .stNumberInput input, .stTextInput input { border: none !important; border-bottom: 1px solid #000 !important; border-radius: 0px !important; font-size: 18px !important; font-weight: 600 !important; }
     .brand-header { font-size: 24px; font-weight: 800; letter-spacing: 6px; text-transform: uppercase; margin-bottom: 40px; border-bottom: 3px solid #000; display: inline-block; }
     .setup-step { font-size: 10px; color: #888; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; }
-    
     .metric-label { font-size: 10px; color: #999; letter-spacing: 3px; text-transform: uppercase; font-weight: 600; }
-    .metric-value { 
-        font-size: 38px; font-weight: 800; margin-top: 5px; 
-        letter-spacing: 1px; line-height: 1.1; color: #000; display: block; 
-    }
+    .metric-value { font-size: 38px; font-weight: 800; margin-top: 5px; letter-spacing: 1px; line-height: 1.1; color: #000; display: block; }
     .card { padding: 30px 0; border-bottom: 1px solid #EEE; margin-bottom: 10px; }
     #MainMenu, footer, header {visibility: hidden;}
     </style>
@@ -63,7 +44,10 @@ st.markdown("""
 keys = ['step', 'opening_balance', 'strategic_reserve', 'incomes', 'expenses', 'investments', 'dreams', 'show_anim', 'reset_mode']
 for key in keys:
     if key not in st.session_state:
-        st.session_state[key] = [] if key in ['incomes', 'expenses'] else (0 if key == 'step' else 0.0)
+        if key == 'step': st.session_state[key] = 0
+        elif key in ['incomes', 'expenses']: st.session_state[key] = []
+        elif key in ['show_anim', 'reset_mode']: st.session_state[key] = False
+        else: st.session_state[key] = 0.0
 
 # --- CONEXÃO E PERSISTÊNCIA ---
 try:
@@ -87,9 +71,8 @@ if st.session_state.show_anim and lottie_success:
     st.session_state.show_anim = False
     st.rerun()
 
-# --- FLUXO DE TELAS INTEGRAL ---
+# --- FLUXO DE TELAS ---
 
-# ETAPA 0: LIQUIDEZ
 if st.session_state.step == 0:
     st.markdown('<p class="setup-step">01_CONFIGURAÇÃO DE CAIXA</p>', unsafe_allow_html=True)
     v_total = st.number_input("SALDO ATUAL EM CONTA", min_value=0.0, format="%.2f", value=st.session_state.opening_balance)
@@ -98,14 +81,12 @@ if st.session_state.step == 0:
         st.session_state.opening_balance, st.session_state.strategic_reserve = v_total, v_reserva
         st.session_state.step = 1; st.session_state.show_anim = True; st.session_state.reset_mode = False; st.rerun()
 
-# ETAPA 1: ENTRADAS
 elif st.session_state.step == 1:
     col_back, _ = st.columns([0.1, 0.9])
     with col_back:
         st.markdown('<div class="back-arrow">', unsafe_allow_html=True)
         if st.button("←", key="back_1"): st.session_state.step = 0; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
-    
     total_in = sum(i['val'] for i in st.session_state.incomes)
     c1, c2 = st.columns([2, 1])
     c1.markdown('<p class="setup-step">02_FLUXO DE ENTRADAS</p>', unsafe_allow_html=True)
@@ -120,14 +101,12 @@ elif st.session_state.step == 1:
     if len(st.session_state.incomes) > 0 and st.button("AVANÇAR PARA CUSTOS FIXOS"):
         st.session_state.step = 2; st.session_state.show_anim = True; st.rerun()
 
-# ETAPA 2: CUSTOS
 elif st.session_state.step == 2:
     col_back, _ = st.columns([0.1, 0.9])
     with col_back:
         st.markdown('<div class="back-arrow">', unsafe_allow_html=True)
         if st.button("←", key="back_2"): st.session_state.step = 1; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
-    
     total_out = sum(e['val'] for e in st.session_state.expenses)
     c1, c2 = st.columns([2, 1])
     c1.markdown('<p class="setup-step">03_CUSTOS FIXOS</p>', unsafe_allow_html=True)
@@ -142,14 +121,12 @@ elif st.session_state.step == 2:
     if len(st.session_state.expenses) > 0 and st.button("AVANÇAR PARA ALOCAÇÃO"):
         st.session_state.step = 3; st.session_state.show_anim = True; st.rerun()
 
-# ETAPA 3: ALOCAÇÃO
 elif st.session_state.step == 3:
     col_back, _ = st.columns([0.1, 0.9])
     with col_back:
         st.markdown('<div class="back-arrow">', unsafe_allow_html=True)
         if st.button("←", key="back_3"): st.session_state.step = 2; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
-
     st.markdown('<p class="setup-step">04_ALOCAÇÃO DE CAPITAL</p>', unsafe_allow_html=True)
     inv = st.number_input("INVESTIMENTOS MENSAL", min_value=0.0, format="%.2f", value=st.session_state.investments)
     drm = st.number_input("SONHOS / LIFESTYLE", min_value=0.0, format="%.2f", value=st.session_state.dreams)
@@ -170,6 +147,7 @@ elif st.session_state.step == 3:
 elif st.session_state.step == 4:
     st.markdown('<p class="setup-step">VISÃO ANALÍTICA CFO.</p>', unsafe_allow_html=True)
     
+    # 1. PROCESSAMENTO DE GASTOS (LÓGICA ACUMULATIVA)
     gastos_totais_mes = 0.0
     gastos_hoje = 0.0
     data_hoje = datetime.now().strftime("%d/%m/%Y")
@@ -177,16 +155,15 @@ elif st.session_state.step == 4:
     try:
         df_l = conn.read(worksheet="Lancamentos", ttl=0)
         if not df_l.empty:
-            df_l['valor'] = pd.to_numeric(df_l['valor'], errors='coerce')
+            df_l['valor'] = pd.to_numeric(df_l['valor'], errors='coerce').fillna(0)
             gastos_totais_mes = df_l['valor'].sum()
-            gastos_hoje = df_l[df_l['data'].str.contains(data_hoje)]['valor'].sum()
+            gastos_hoje = df_l[df_l['data'].str.contains(data_hoje, na=False)]['valor'].sum()
     except: pass
 
-    hoje = datetime.now()
-    ultimo_dia = 31
-    dias_restantes = max(ultimo_dia - hoje.day, 1)
+    # 2. CÁLCULOS TEMPORAIS
+    dias_restantes = max(31 - datetime.now().day, 1)
 
-    # Gráfico Projeção
+    # 3. GRÁFICO DE PROJEÇÃO
     dias = np.arange(1, 32)
     saldo_diario = []
     current_cash = st.session_state.opening_balance - st.session_state.investments - st.session_state.dreams - gastos_totais_mes
@@ -203,27 +180,27 @@ elif st.session_state.step == 4:
                              customdata=[format_br(v) for v in saldo_diario]))
     fig.add_hline(y=st.session_state.strategic_reserve/1000, line_dash="dash", line_color="#CCC", line_width=1)
     fig.update_layout(plot_bgcolor='white', paper_bgcolor='white', height=250, margin=dict(l=0, r=0, t=10, b=0),
-                      xaxis=dict(showgrid=False), yaxis=dict(gridcolor='#F9F9F9', tickformat='.0f', ticksuffix='k'),
+                      xaxis=dict(showgrid=False, tickfont=dict(size=9, color='#AAA')),
+                      yaxis=dict(gridcolor='#F9F9F9', tickformat='.0f', tickfont=dict(size=9, color='#AAA'), ticksuffix='k'),
                       showlegend=False)
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # KPIs Reais
-    t_in = sum(i['val'] for i in st.session_state.incomes)
-    t_out = sum(e['val'] for e in st.session_state.expenses)
+    # 4. KPIS EM TEMPO REAL
+    t_in, t_out = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
     livre_mes = (st.session_state.opening_balance - st.session_state.strategic_reserve + t_in) - t_out - st.session_state.investments - st.session_state.dreams - gastos_totais_mes
     
-    meta_diaria_ideal = (livre_mes + gastos_hoje) / (dias_restantes + 1)
-    cota_restante_hoje = meta_diaria_ideal - gastos_hoje
+    meta_diaria_teorica = (livre_mes + gastos_hoje) / (dias_restantes + 1)
+    cota_agora = meta_diaria_teorica - gastos_hoje
 
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f'<div class="card"><p class="metric-label">Operacional Restante</p><p class="metric-value">{format_br(livre_mes)}</p></div>', unsafe_allow_html=True)
     with col2:
-        st.markdown(f'<div class="card"><p class="metric-label">Cota Restante (Hoje)</p><p class="metric-value">{format_br(cota_restante_hoje)}</p></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="card"><p class="metric-label">Cota Restante (Hoje)</p><p class="metric-value">{format_br(cota_agora)[:-3]}</p></div>', unsafe_allow_html=True)
 
     st.markdown(f'<p style="color:#888; font-size:11px; margin-top:-10px;">Gasto acumulado no mês: {format_br(gastos_totais_mes)}</p>', unsafe_allow_html=True)
 
-    # Registro de Gasto
+    # 5. O NOVO MOTOR DE LANÇAMENTO (ANTI-SOBREPOSIÇÃO)
     with st.expander("📝 REGISTRAR NOVO GASTO", expanded=False):
         c_l1, c_l2 = st.columns([2, 1])
         l_desc = c_l1.text_input("DESCRIÇÃO", placeholder="Ex: Jantar")
@@ -231,15 +208,20 @@ elif st.session_state.step == 4:
         if st.button("LOG_CASH_OUT"):
             novo_log = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y %H:%M"), "descricao": l_desc, "valor": l_val}])
             try:
-                hist_df = conn.read(worksheet="Lancamentos", ttl=0)
-                updated_df = pd.concat([hist_df, novo_log], ignore_index=True)
-                conn.update(worksheet="Lancamentos", data=updated_df)
+                # 1. Tenta ler o histórico atual
+                existing_logs = conn.read(worksheet="Lancamentos", ttl=0)
+                # 2. Une o histórico com o novo gasto (Buffer de segurança)
+                if not existing_logs.empty:
+                    final_df = pd.concat([existing_logs, novo_log], ignore_index=True)
+                else:
+                    final_df = novo_log
+                # 3. Atualiza a planilha com a lista COMPLETA
+                conn.update(worksheet="Lancamentos", data=final_df)
                 st.session_state.show_anim = True; st.rerun()
             except:
+                # Se a aba estiver vazia ou for a primeira vez
                 conn.update(worksheet="Lancamentos", data=novo_log)
                 st.session_state.show_anim = True; st.rerun()
 
     if st.button("REDEFINIR ESTRATÉGIA"):
-        st.session_state.step = 0
-        st.session_state.reset_mode = True
-        st.rerun()
+        st.session_state.step = 0; st.session_state.reset_mode = True; st.rerun()
