@@ -9,7 +9,7 @@ from streamlit_lottie import st_lottie
 # --- ESTÉTICA PERFORMANCE TERMINAL (RUNWAY / APPLE / SATISFY) ---
 st.set_page_config(page_title="RUNWAY | CFO Pessoal", layout="centered")
 
-# Função para carregar animações com Tratamento de Erro (CTO Shield)
+# Função Segura para carregar animações
 def load_lottieurl(url: str):
     try:
         r = requests.get(url, timeout=5)
@@ -18,7 +18,7 @@ def load_lottieurl(url: str):
     except:
         return None
 
-# Link de checkmark minimalista (Link reserva caso o principal falhe)
+# Carregamento sutil de checkmark
 lottie_success = load_lottieurl("https://lottie.host/5a2d67a1-94a3-4886-905c-5912389d4d03/GjX1Xl9T8y.json")
 
 # Função de Formatação Brasileira (Ex: 13.000,00)
@@ -74,15 +74,15 @@ for key in keys:
 # --- HEADER ---
 st.markdown('<p class="brand-header">RUNWAY</p>', unsafe_allow_html=True)
 
-# --- MICRO-ANIMAÇÃO DE SUCESSO (COM TRAVA DE SEGURANÇA) ---
+# --- MICRO-ANIMAÇÃO (CONTROLE DE ERRO) ---
 if st.session_state.show_anim:
     if lottie_success:
-        st_lottie(lottie_success, height=100, speed=1.5, key="success_anim")
-        time.sleep(1)
+        st_lottie(lottie_success, height=80, speed=1.5, key="success_anim")
+        time.sleep(0.8)
     st.session_state.show_anim = False
     st.rerun()
 
-# --- NAVEGAÇÃO ---
+# --- ETAPAS ---
 if st.session_state.step == 0:
     st.markdown('<p class="setup-step">01_CONFIGURAÇÃO DE CAIXA</p>', unsafe_allow_html=True)
     val_total = st.number_input("SALDO ATUAL EM CONTA", min_value=0.0, format="%.2f")
@@ -139,7 +139,7 @@ elif st.session_state.step == 3:
         st.session_state.investments, st.session_state.dreams = inv, drm
         st.session_state.step = 4; st.session_state.show_anim = True; st.rerun()
 
-# --- DASHBOARD FINAL ---
+# --- DASHBOARD ---
 elif st.session_state.step == 4:
     st.markdown('<p class="setup-step">VISÃO ANALÍTICA CFO</p>', unsafe_allow_html=True)
     
@@ -167,9 +167,9 @@ elif st.session_state.step == 4:
                       showlegend=False)
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    total_in = sum(i['val'] for i in st.session_state.incomes)
-    total_out = sum(e['val'] for e in st.session_state.expenses)
-    livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + total_in) - total_out - st.session_state.investments - st.session_state.dreams
+    t_in = sum(i['val'] for i in st.session_state.incomes)
+    t_out = sum(e['val'] for e in st.session_state.expenses)
+    livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + t_in) - t_out - st.session_state.investments - st.session_state.dreams
     
     st.markdown(f'<div class="card"><p class="metric-label">Capital Operacional</p><p class="metric-value">{format_br(livre)}</p></div>', unsafe_allow_html=True)
     st.markdown(f'<div class="card"><p class="metric-label">Cota Diária</p><p class="metric-value">{format_br(max(livre/30, 0))[:-3]}</p></div>', unsafe_allow_html=True)
@@ -177,4 +177,14 @@ elif st.session_state.step == 4:
     with st.expander("DETALHAMENTO E AUDITORIA", expanded=False):
         audit_html = f"""
         <div style="font-size: 11px; color: #666; font-family: 'Inter'; letter-spacing: 0.5px;">
-            <div
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>(+) SALDO INICIAL</span><span>{format_br(st.session_state.opening_balance)}</span></div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>(-) RESERVA BLINDADA</span><span>{format_br(st.session_state.strategic_reserve)}</span></div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>(+) TOTAL RECEITAS</span><span>{format_br(t_in)}</span></div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>(-) CUSTOS FIXOS</span><span>{format_br(t_out)}</span></div>
+            <div style="display: flex; justify-content: space-between; padding: 12px 0; color: #000; font-weight: 800; border-top: 1px solid #000;"><span>LIQUIDEZ LÍQUIDA</span><span>{format_br(livre)}</span></div>
+        </div>
+        """
+        st.markdown(audit_html, unsafe_allow_html=True)
+
+    if st.button("REINICIAR ESTRATÉGIA"):
+        st.session_state.step = 0; st.rerun()
