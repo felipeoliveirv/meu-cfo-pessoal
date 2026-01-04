@@ -13,7 +13,6 @@ st.set_page_config(page_title="CFO. | Operação", layout="centered")
 
 def format_br(val):
     if val is None: return "R$ 0,00"
-    # Espaço duplo para garantir que o R$ não "encoste" no número
     return "R$  {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
 
 def load_lottieurl(url: str):
@@ -30,20 +29,18 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #FFFFFF; color: #000; }
     
-    /* Botões Principais */
     .stButton>button { 
         width: 100%; background-color: #000 !important; color: #FFF !important; 
         border-radius: 0px; padding: 14px; font-weight: 800; border: none; 
         text-transform: uppercase; letter-spacing: 2px; font-size: 11px;
     }
 
-    /* Navegação Stealth (Twin Arrows sem fundo) */
+    /* Twin Arrows Stealth - Sem fundo */
     .nav-btn>div>button {
         background: none !important; border: none !important; box-shadow: none !important;
         color: #000 !important; font-size: 26px !important; width: auto !important;
-        padding: 0 15px !important; margin: 0 !important; line-height: 1 !important;
+        padding: 0 15px !important; margin: 0 !important;
     }
-    .nav-btn>div>button:active, .nav-btn>div>button:focus { background: none !important; color: #888 !important; }
 
     .stNumberInput input, .stTextInput input {
         border: none !important; border-bottom: 1px solid #000 !important;
@@ -52,33 +49,43 @@ st.markdown("""
     
     .brand-header { font-size: 24px; font-weight: 800; letter-spacing: 6px; text-transform: uppercase; margin-bottom: 20px; border-bottom: 3px solid #000; display: inline-block; }
     .setup-step { font-size: 10px; color: #888; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; }
-    
     .metric-label { font-size: 10px; color: #999; letter-spacing: 3px; text-transform: uppercase; font-weight: 600; }
     .metric-value { font-size: 38px; font-weight: 800; margin-top: 5px; letter-spacing: normal; line-height: 1.1; color: #000; display: block; }
     .card { padding: 30px 0; border-bottom: 1px solid #EEE; margin-bottom: 10px; }
-    
     #MainMenu, footer, header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- ENGINE ---
+# --- ENGINE DE ESTADO ---
 keys = ['step', 'opening_balance', 'strategic_reserve', 'incomes', 'expenses', 'investments', 'dreams', 'show_anim', 'reset_mode']
 for key in keys:
     if key not in st.session_state:
         st.session_state[key] = [] if key in ['incomes', 'expenses'] else (0 if key == 'step' else 0.0)
 
-# --- CONEXÃO ---
+# --- CONEXÃO E CARREGAMENTO PROFUNDO ---
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     if st.session_state.step == 0 and not st.session_state.reset_mode:
-        check_df = conn.read(worksheet="Config", usecols=[0,1], ttl=0)
-        if not check_df.empty:
-            st.session_state.step = 4
-            for _, row in check_df.iterrows():
+        # 1. Carregar Configurações Básicas
+        config_df = conn.read(worksheet="Config", usecols=[0,1], ttl=0)
+        if not config_df.empty:
+            for _, row in config_df.iterrows():
                 if row['parametro'] == 'saldo_inicial': st.session_state.opening_balance = float(row['valor'])
                 if row['parametro'] == 'reserva': st.session_state.strategic_reserve = float(row['valor'])
                 if row['parametro'] == 'investimento': st.session_state.investments = float(row['valor'])
                 if row['parametro'] == 'sonhos': st.session_state.dreams = float(row['valor'])
+            
+            # 2. Carregar Receitas Detalhadas (A Timeline depende disso)
+            inc_df = conn.read(worksheet="Receitas", ttl=0)
+            if not inc_df.empty:
+                st.session_state.incomes = inc_df.to_dict('records')
+            
+            # 3. Carregar Custos Fixos Detalhados (A Timeline depende disso)
+            exp_df = conn.read(worksheet="Custos", ttl=0)
+            if not exp_df.empty:
+                st.session_state.expenses = exp_df.to_dict('records')
+                
+            st.session_state.step = 4
 except: pass
 
 st.markdown('<p class="brand-header">CFO.</p>', unsafe_allow_html=True)
@@ -89,16 +96,16 @@ if st.session_state.show_anim and lottie_success:
     st.session_state.show_anim = False
     st.rerun()
 
-# --- NAVEGAÇÃO SUPERIOR (STEALTH TWIN ARROWS) ---
+# --- NAVEGAÇÃO TWIN ARROWS ---
 if 0 < st.session_state.step < 4:
     c_nav1, c_nav2, _ = st.columns([0.8, 0.8, 8.4])
     with c_nav1:
         st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
-        if st.button("←", key="p_v"): st.session_state.step -= 1; st.rerun()
+        if st.button("←", key="prev"): st.session_state.step -= 1; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     with c_nav2:
         st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
-        if st.button("→", key="n_v"): st.session_state.step += 1; st.rerun()
+        if st.button("→", key="next"): st.session_state.step += 1; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- ETAPAS DO SETUP ---
@@ -142,20 +149,31 @@ elif st.session_state.step == 3:
     drm = st.number_input("SONHOS", format="%.2f", value=st.session_state.dreams)
     if st.button("SALVAR E FINALIZAR SETUP"):
         st.session_state.investments, st.session_state.dreams = inv, drm
-        df_save = pd.DataFrame([{"parametro": "saldo_inicial", "valor": st.session_state.opening_balance}, {"parametro": "reserva", "valor": st.session_state.strategic_reserve}, {"parametro": "investimento", "valor": st.session_state.investments}, {"parametro": "sonhos", "valor": st.session_state.dreams}])
-        try: conn.update(worksheet="Config", data=df_save)
+        
+        # PERSISTÊNCIA MULTI-ABA (SALVAMENTO ATÔMICO)
+        try:
+            # 1. Salvar Config
+            df_config = pd.DataFrame([{"parametro": "saldo_inicial", "valor": st.session_state.opening_balance}, {"parametro": "reserva", "valor": st.session_state.strategic_reserve}, {"parametro": "investimento", "valor": st.session_state.investments}, {"parametro": "sonhos", "valor": st.session_state.dreams}])
+            conn.update(worksheet="Config", data=df_config)
+            
+            # 2. Salvar Receitas
+            if st.session_state.incomes:
+                conn.update(worksheet="Receitas", data=pd.DataFrame(st.session_state.incomes))
+            
+            # 3. Salvar Custos Fixos
+            if st.session_state.expenses:
+                conn.update(worksheet="Custos", data=pd.DataFrame(st.session_state.expenses))
+                
         except: pass
         st.session_state.step = 4; st.session_state.show_anim = True; st.rerun()
 
 # --- OPERAÇÃO (DASHBOARD) ---
 elif st.session_state.step == 4:
     st.markdown('<p class="setup-step">VISÃO ANALÍTICA CFO.</p>', unsafe_allow_html=True)
-    
     agora_br = datetime.now() - timedelta(hours=3)
     hoje_str = agora_br.strftime("%d/%m/%Y")
     
-    gastos_totais = 0.0
-    gastos_hoje = 0.0
+    gastos_totais, gastos_hoje = 0.0, 0.0
     try:
         df_l = conn.read(worksheet="Lancamentos", ttl=0)
         if not df_l.empty:
@@ -167,23 +185,26 @@ elif st.session_state.step == 4:
     d_r = max(31 - agora_br.day, 1)
     dias = np.arange(1, 32)
     saldo_d = []
-    c_c = st.session_state.opening_balance - st.session_state.investments - st.session_state.dreams - gastos_totais
+    # O Caixa Operacional nasce descontando Investimentos, Sonhos e tudo que já foi logado no dia a dia
+    caixa_atual = st.session_state.opening_balance - st.session_state.investments - st.session_state.dreams - gastos_totais
+    
     for dia in dias:
         for inc in st.session_state.incomes:
-            if inc['date'] == dia: c_c += inc['val']
+            if inc['date'] == dia: caixa_atual += inc['val']
         for exp in st.session_state.expenses:
-            if exp['date'] == dia: c_c -= exp['val']
-        saldo_d.append(c_c)
+            if exp['date'] == dia: caixa_atual -= exp['val']
+        saldo_d.append(caixa_atual)
 
     # GRÁFICO (REMOÇÃO DO TRACE 0)
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=dias, y=[v/1000 for v in saldo_d], mode='lines', line=dict(color='black', width=3), 
-                             hovertemplate='Saldo: %{customdata}<extra></extra>', # <extra></extra> remove o trace info
+                             hovertemplate='Saldo: %{customdata}<extra></extra>',
                              customdata=[format_br(v) for v in saldo_d]))
     fig.add_hline(y=st.session_state.strategic_reserve/1000, line_dash="dash", line_color="#CCC")
     fig.update_layout(plot_bgcolor='white', paper_bgcolor='white', height=250, margin=dict(l=0, r=0, t=10, b=0), xaxis=dict(showgrid=False), yaxis=dict(gridcolor='#F9F9F9', tickformat='.0f', ticksuffix='k'), showlegend=False)
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
+    # KPIS
     t_in, t_out = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
     livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + t_in) - t_out - st.session_state.investments - st.session_state.dreams - gastos_totais
     meta_d = (livre + gastos_hoje) / (d_r + 1)
@@ -221,12 +242,8 @@ elif st.session_state.step == 4:
         if not df_l.empty:
             st.markdown("---")
             st.markdown('<p style="font-size:10px; color:#888; letter-spacing: 2px;">ÚLTIMOS LANÇAMENTOS:</p>', unsafe_allow_html=True)
-            
-            # TABELA CUSTOMIZADA ESTILO AUDITORIA
             logs_html = '<div style="font-size: 11px; color: #666; font-family: \'Inter\'; letter-spacing: 0.5px;">'
-            # Pegar os últimos 5 e inverter para o mais recente ficar no topo
-            recent_df = df_l.tail(5).iloc[::-1]
-            for _, row in recent_df.iterrows():
+            for _, row in df_l.tail(5).iloc[::-1].iterrows():
                 logs_html += f'<div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>{row["descricao"]}</span><span>{format_br(row["valor"])}</span></div>'
             logs_html += '</div>'
             st.markdown(logs_html, unsafe_allow_html=True)
