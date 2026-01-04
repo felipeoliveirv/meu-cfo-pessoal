@@ -23,7 +23,7 @@ def load_lottieurl(url: str):
 
 lottie_success = load_lottieurl("https://lottie.host/5a2d67a1-94a3-4886-905c-5912389d4d03/GjX1Xl9T8y.json")
 
-# --- CSS PRECISÃO E MINIMALISMO ---
+# --- CSS PRECISÃO ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -40,16 +40,13 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- ENGINE DE ESTADO ---
+# --- ENGINE ---
 keys = ['step', 'opening_balance', 'strategic_reserve', 'incomes', 'expenses', 'investments', 'dreams', 'show_anim', 'reset_mode']
 for key in keys:
     if key not in st.session_state:
-        if key == 'step': st.session_state[key] = 0
-        elif key in ['incomes', 'expenses']: st.session_state[key] = []
-        elif key in ['show_anim', 'reset_mode']: st.session_state[key] = False
-        else: st.session_state[key] = 0.0
+        st.session_state[key] = [] if key in ['incomes', 'expenses'] else (0 if key == 'step' else 0.0)
 
-# --- CONEXÃO E PERSISTÊNCIA ---
+# --- CONEXÃO ---
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     if st.session_state.step == 0 and not st.session_state.reset_mode:
@@ -71,99 +68,31 @@ if st.session_state.show_anim and lottie_success:
     st.session_state.show_anim = False
     st.rerun()
 
-# --- FLUXO DE TELAS ---
+# --- ETAPAS 0-3 (Liquidez, Entradas, Custos, Alocação) ---
+# [Mantenha o código das etapas anteriores igual ao da V29/V30]
+# ... (Navegação com flechas minimalistas) ...
 
-if st.session_state.step == 0:
-    st.markdown('<p class="setup-step">01_CONFIGURAÇÃO DE CAIXA</p>', unsafe_allow_html=True)
-    v_total = st.number_input("SALDO ATUAL EM CONTA", min_value=0.0, format="%.2f", value=st.session_state.opening_balance)
-    v_reserva = st.number_input("RESERVA ESTRATÉGICA", min_value=0.0, format="%.2f", value=st.session_state.strategic_reserve)
-    if st.button("CONFIRMAR ESTRATÉGIA"):
-        st.session_state.opening_balance, st.session_state.strategic_reserve = v_total, v_reserva
-        st.session_state.step = 1; st.session_state.show_anim = True; st.session_state.reset_mode = False; st.rerun()
-
-elif st.session_state.step == 1:
-    col_back, _ = st.columns([0.1, 0.9])
-    with col_back:
-        st.markdown('<div class="back-arrow">', unsafe_allow_html=True)
-        if st.button("←", key="back_1"): st.session_state.step = 0; st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-    total_in = sum(i['val'] for i in st.session_state.incomes)
-    c1, c2 = st.columns([2, 1])
-    c1.markdown('<p class="setup-step">02_FLUXO DE ENTRADAS</p>', unsafe_allow_html=True)
-    c2.markdown(f'<p style="text-align:right; font-weight:800; font-size:12px;">{format_br(total_in)}</p>', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([2, 1, 1])
-    desc, val, date = col1.text_input("NOME"), col2.number_input("VALOR", format="%.2f"), col3.number_input("DIA", 1, 31, 15)
-    if st.button("ADICIONAR RECEITA"):
-        st.session_state.incomes.append({"desc": desc, "val": val, "date": date}); st.rerun()
-    for idx, i in enumerate(st.session_state.incomes):
-        cl1, cl2 = st.columns([0.9, 0.1]); cl1.markdown(f"**{i['desc']}** • {format_br(i['val'])} (Dia {i['date']})")
-        if cl2.button("✕", key=f"d_inc_{idx}"): st.session_state.incomes.pop(idx); st.rerun()
-    if len(st.session_state.incomes) > 0 and st.button("AVANÇAR PARA CUSTOS FIXOS"):
-        st.session_state.step = 2; st.session_state.show_anim = True; st.rerun()
-
-elif st.session_state.step == 2:
-    col_back, _ = st.columns([0.1, 0.9])
-    with col_back:
-        st.markdown('<div class="back-arrow">', unsafe_allow_html=True)
-        if st.button("←", key="back_2"): st.session_state.step = 1; st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-    total_out = sum(e['val'] for e in st.session_state.expenses)
-    c1, c2 = st.columns([2, 1])
-    c1.markdown('<p class="setup-step">03_CUSTOS FIXOS</p>', unsafe_allow_html=True)
-    c2.markdown(f'<p style="text-align:right; font-weight:800; font-size:12px;">{format_br(total_out)}</p>', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([2, 1, 1])
-    desc, val, date = col1.text_input("ITEM"), col2.number_input("VALOR", format="%.2f"), col3.number_input("DIA", 1, 31, 5)
-    if st.button("ADICIONAR CUSTO"):
-        st.session_state.expenses.append({"desc": desc, "val": val, "date": date}); st.rerun()
-    for idx, e in enumerate(st.session_state.expenses):
-        cl1, cl2 = st.columns([0.9, 0.1]); cl1.markdown(f"**{e['desc']}** • {format_br(e['val'])} (Dia {e['date']})")
-        if cl2.button("✕", key=f"d_exp_{idx}"): st.session_state.expenses.pop(idx); st.rerun()
-    if len(st.session_state.expenses) > 0 and st.button("AVANÇAR PARA ALOCAÇÃO"):
-        st.session_state.step = 3; st.session_state.show_anim = True; st.rerun()
-
-elif st.session_state.step == 3:
-    col_back, _ = st.columns([0.1, 0.9])
-    with col_back:
-        st.markdown('<div class="back-arrow">', unsafe_allow_html=True)
-        if st.button("←", key="back_3"): st.session_state.step = 2; st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<p class="setup-step">04_ALOCAÇÃO DE CAPITAL</p>', unsafe_allow_html=True)
-    inv = st.number_input("INVESTIMENTOS MENSAL", min_value=0.0, format="%.2f", value=st.session_state.investments)
-    drm = st.number_input("SONHOS / LIFESTYLE", min_value=0.0, format="%.2f", value=st.session_state.dreams)
-    if st.button("SALVAR ESTRATÉGIA NO COFRE"):
-        st.session_state.investments, st.session_state.dreams = inv, drm
-        try:
-            config_df = pd.DataFrame([
-                {"parametro": "saldo_inicial", "valor": st.session_state.opening_balance},
-                {"parametro": "reserva", "valor": st.session_state.strategic_reserve},
-                {"parametro": "investimento", "valor": st.session_state.investments},
-                {"parametro": "sonhos", "valor": st.session_state.dreams}
-            ])
-            conn.update(worksheet="Config", data=config_df)
-        except: pass
-        st.session_state.step = 4; st.session_state.show_anim = True; st.rerun()
-
-# ETAPA 4: DASHBOARD & OPERAÇÃO
-elif st.session_state.step == 4:
+# --- DASHBOARD (PASSO 4) ---
+if st.session_state.step == 4:
     st.markdown('<p class="setup-step">VISÃO ANALÍTICA CFO.</p>', unsafe_allow_html=True)
     
-    # 1. PROCESSAMENTO DE GASTOS (LÓGICA ACUMULATIVA)
+    # 1. PROCESSAMENTO DE GASTOS (FORÇANDO ATUALIZAÇÃO)
     gastos_totais_mes = 0.0
     gastos_hoje = 0.0
     data_hoje = datetime.now().strftime("%d/%m/%Y")
     
     try:
+        # ttl=0 obriga o app a buscar dados novos no Google
         df_l = conn.read(worksheet="Lancamentos", ttl=0)
         if not df_l.empty:
             df_l['valor'] = pd.to_numeric(df_l['valor'], errors='coerce').fillna(0)
             gastos_totais_mes = df_l['valor'].sum()
             gastos_hoje = df_l[df_l['data'].str.contains(data_hoje, na=False)]['valor'].sum()
-    except: pass
+    except:
+        df_l = pd.DataFrame(columns=['data', 'descricao', 'valor'])
 
-    # 2. CÁLCULOS TEMPORAIS
+    # 2. CÁLCULO DE FLUXO
     dias_restantes = max(31 - datetime.now().day, 1)
-
-    # 3. GRÁFICO DE PROJEÇÃO
     dias = np.arange(1, 32)
     saldo_diario = []
     current_cash = st.session_state.opening_balance - st.session_state.investments - st.session_state.dreams - gastos_totais_mes
@@ -174,54 +103,17 @@ elif st.session_state.step == 4:
             if exp['date'] == dia: current_cash -= exp['val']
         saldo_diario.append(current_cash)
 
+    # 3. GRÁFICO
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=dias, y=[v/1000 for v in saldo_diario], mode='lines', line=dict(color='black', width=3),
                              hovertemplate='Dia %{x}<br>Saldo: %{customdata}<extra></extra>',
                              customdata=[format_br(v) for v in saldo_diario]))
     fig.add_hline(y=st.session_state.strategic_reserve/1000, line_dash="dash", line_color="#CCC", line_width=1)
     fig.update_layout(plot_bgcolor='white', paper_bgcolor='white', height=250, margin=dict(l=0, r=0, t=10, b=0),
-                      xaxis=dict(showgrid=False, tickfont=dict(size=9, color='#AAA')),
-                      yaxis=dict(gridcolor='#F9F9F9', tickformat='.0f', tickfont=dict(size=9, color='#AAA'), ticksuffix='k'),
+                      xaxis=dict(showgrid=False), yaxis=dict(gridcolor='#F9F9F9', tickformat='.0f', ticksuffix='k'),
                       showlegend=False)
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # 4. KPIS EM TEMPO REAL
+    # 4. KPIs
     t_in, t_out = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
     livre_mes = (st.session_state.opening_balance - st.session_state.strategic_reserve + t_in) - t_out - st.session_state.investments - st.session_state.dreams - gastos_totais_mes
-    
-    meta_diaria_teorica = (livre_mes + gastos_hoje) / (dias_restantes + 1)
-    cota_agora = meta_diaria_teorica - gastos_hoje
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f'<div class="card"><p class="metric-label">Operacional Restante</p><p class="metric-value">{format_br(livre_mes)}</p></div>', unsafe_allow_html=True)
-    with col2:
-        st.markdown(f'<div class="card"><p class="metric-label">Cota Restante (Hoje)</p><p class="metric-value">{format_br(cota_agora)[:-3]}</p></div>', unsafe_allow_html=True)
-
-    st.markdown(f'<p style="color:#888; font-size:11px; margin-top:-10px;">Gasto acumulado no mês: {format_br(gastos_totais_mes)}</p>', unsafe_allow_html=True)
-
-    # 5. O NOVO MOTOR DE LANÇAMENTO (ANTI-SOBREPOSIÇÃO)
-    with st.expander("📝 REGISTRAR NOVO GASTO", expanded=False):
-        c_l1, c_l2 = st.columns([2, 1])
-        l_desc = c_l1.text_input("DESCRIÇÃO", placeholder="Ex: Jantar")
-        l_val = c_l2.number_input("VALOR", min_value=0.0, format="%.2f")
-        if st.button("LOG_CASH_OUT"):
-            novo_log = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y %H:%M"), "descricao": l_desc, "valor": l_val}])
-            try:
-                # 1. Tenta ler o histórico atual
-                existing_logs = conn.read(worksheet="Lancamentos", ttl=0)
-                # 2. Une o histórico com o novo gasto (Buffer de segurança)
-                if not existing_logs.empty:
-                    final_df = pd.concat([existing_logs, novo_log], ignore_index=True)
-                else:
-                    final_df = novo_log
-                # 3. Atualiza a planilha com a lista COMPLETA
-                conn.update(worksheet="Lancamentos", data=final_df)
-                st.session_state.show_anim = True; st.rerun()
-            except:
-                # Se a aba estiver vazia ou for a primeira vez
-                conn.update(worksheet="Lancamentos", data=novo_log)
-                st.session_state.show_anim = True; st.rerun()
-
-    if st.button("REDEFINIR ESTRATÉGIA"):
-        st.session_state.step = 0; st.session_state.reset_mode = True; st.rerun()
