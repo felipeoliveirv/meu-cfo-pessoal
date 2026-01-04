@@ -117,3 +117,51 @@ if st.session_state.step == 4:
     # 4. KPIs
     t_in, t_out = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
     livre_mes = (st.session_state.opening_balance - st.session_state.strategic_reserve + t_in) - t_out - st.session_state.investments - st.session_state.dreams - gastos_totais_mes
+    meta_diaria = (livre_mes + gastos_hoje) / (dias_restantes + 1)
+    cota_agora = meta_diaria - gastos_hoje
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f'<div class="card"><p class="metric-label">Operacional Restante</p><p class="metric-value">{format_br(livre_mes)}</p></div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown(f'<div class="card"><p class="metric-label">Cota Restante (Hoje)</p><p class="metric-value">{format_br(cota_agora)[:-3]}</p></div>', unsafe_allow_html=True)
+
+    st.markdown(f'<p style="color:#888; font-size:11px; margin-top:-10px;">Gasto acumulado no mês: {format_br(gastos_totais_mes)}</p>', unsafe_allow_html=True)
+
+    # 5. REGISTRO (LOG) COM PROTEÇÃO DE SOBREPOSIÇÃO
+    with st.expander("📝 REGISTRAR NOVO GASTO", expanded=False):
+        c_l1, c_l2 = st.columns([2, 1])
+        l_desc = c_l1.text_input("DESCRIÇÃO", placeholder="Ex: Jantar")
+        l_val = c_l2.number_input("VALOR", min_value=0.0, format="%.2f")
+        
+        if st.button("LOG_CASH_OUT"):
+            with st.spinner("Sincronizando com o cofre..."):
+                novo_log = pd.DataFrame([{"data": datetime.now().strftime("%d/%m/%Y %H:%M"), "descricao": l_desc, "valor": l_val}])
+                
+                # BUSCA O HISTÓRICO MAIS RECENTE POSSÍVEL
+                try:
+                    fresh_logs = conn.read(worksheet="Lancamentos", ttl=0)
+                    if not fresh_logs.empty:
+                        # Une os dados antigos com o novo
+                        final_data = pd.concat([fresh_logs, novo_log], ignore_index=True)
+                    else:
+                        final_data = novo_log
+                    
+                    # Salva a lista completa e atualizada
+                    conn.update(worksheet="Lancamentos", data=final_data)
+                    st.session_state.show_anim = True
+                    st.rerun()
+                except:
+                    # Se der erro na leitura, ele tenta salvar como o primeiro item apenas se tiver certeza
+                    conn.update(worksheet="Lancamentos", data=novo_log)
+                    st.session_state.show_anim = True
+                    st.rerun()
+        
+        # TABELA DE CONFERÊNCIA (Últimos 3 gastos)
+        if not df_l.empty:
+            st.markdown("---")
+            st.markdown('<p style="font-size:10px; color:#888;">ÚLTIMOS LANÇAMENTOS:</p>', unsafe_allow_html=True)
+            st.table(df_l.tail(3)[['descricao', 'valor']])
+
+    if st.button("REDEFINIR ESTRATÉGIA"):
+        st.session_state.step = 0; st.session_state.reset_mode = True; st.rerun()
