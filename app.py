@@ -13,7 +13,7 @@ def format_br(val):
     if val is None: return "R$ 0,00"
     return "R$ {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- CSS PRECISÃO V50.0 ---
+# --- CSS PRECISÃO V51.0 ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -23,6 +23,15 @@ st.markdown("""
         width: 100%; background-color: #000 !important; color: #FFF !important; 
         border-radius: 0px; padding: 14px; font-weight: 800; border: none; 
         text-transform: uppercase; letter-spacing: 2px; font-size: 11px;
+    }
+
+    /* Botão de Voltar Discreto */
+    div[data-testid="stColumn"]:nth-child(1) .stButton>button {
+        background-color: transparent !important; color: #BBB !important;
+        border: 1px solid #EEE !important; font-size: 16px !important;
+    }
+    div[data-testid="stColumn"]:nth-child(1) .stButton>button:hover {
+        color: #000 !important; border-color: #000 !important;
     }
 
     .stNumberInput input, .stTextInput input {
@@ -89,7 +98,12 @@ elif st.session_state.step == 1:
     res = st.number_input("Reserva Blindada", value=st.session_state.strategic_reserve, step=100.0)
     inv = st.number_input("Investimentos do Mês", value=st.session_state.investments, step=100.0)
     drm = st.number_input("Reserva para Sonhos", value=st.session_state.dreams, step=100.0)
-    if st.button("PRÓXIMO"):
+    
+    c_btn1, c_btn2 = st.columns([0.2, 0.8])
+    if c_btn1.button("←", key="back_0"):
+        st.session_state.step = 0
+        st.rerun()
+    if c_btn2.button("PRÓXIMO"):
         st.session_state.strategic_reserve = res
         st.session_state.investments = inv
         st.session_state.dreams = drm
@@ -101,13 +115,12 @@ elif st.session_state.step == 2:
     st.markdown('### Receitas do Mês')
     with st.form("form_incomes", clear_on_submit=True):
         c1, c2 = st.columns([2, 1])
-        desc = c1.text_input("Nova Receita (Ex: Freelance)")
+        desc = c1.text_input("Nova Receita")
         valor = c2.number_input("Valor", min_value=0.0, step=100.0)
         if st.form_submit_button("ADICIONAR"):
             st.session_state.incomes.append({"desc": desc, "val": valor})
             st.rerun()
     
-    st.markdown("---")
     for idx, i in enumerate(st.session_state.incomes):
         col_i1, col_i2 = st.columns([0.9, 0.1])
         col_i1.write(f"✅ {i['desc']}: {format_br(i['val'])}")
@@ -115,7 +128,12 @@ elif st.session_state.step == 2:
             st.session_state.incomes.pop(idx)
             st.rerun()
     
-    if st.button("PRÓXIMO"):
+    st.markdown("---")
+    c_btn1, c_btn2 = st.columns([0.2, 0.8])
+    if c_btn1.button("←", key="back_1"):
+        st.session_state.step = 1
+        st.rerun()
+    if c_btn2.button("PRÓXIMO"):
         st.session_state.step = 3
         st.rerun()
 
@@ -124,13 +142,12 @@ elif st.session_state.step == 3:
     st.markdown('### Custos Fixos')
     with st.form("form_expenses", clear_on_submit=True):
         c1, c2 = st.columns([2, 1])
-        desc = c1.text_input("Novo Custo (Ex: Aluguel)")
+        desc = c1.text_input("Novo Custo")
         valor = c2.number_input("Valor", min_value=0.0, step=100.0)
         if st.form_submit_button("ADICIONAR"):
             st.session_state.expenses.append({"desc": desc, "val": valor})
             st.rerun()
     
-    st.markdown("---")
     for idx, e in enumerate(st.session_state.expenses):
         col_e1, col_e2 = st.columns([0.9, 0.1])
         col_e1.write(f"❌ {e['desc']}: {format_br(e['val'])}")
@@ -138,8 +155,12 @@ elif st.session_state.step == 3:
             st.session_state.expenses.pop(idx)
             st.rerun()
     
-    if st.button("FINALIZAR REVISÃO"):
-        # Salvar as alterações na Planilha
+    st.markdown("---")
+    c_btn1, c_btn2 = st.columns([0.2, 0.8])
+    if c_btn1.button("←", key="back_2"):
+        st.session_state.step = 2
+        st.rerun()
+    if c_btn2.button("FINALIZAR REVISÃO"):
         config_data = pd.DataFrame([
             {"parametro": "saldo_inicial", "valor": st.session_state.opening_balance},
             {"parametro": "reserva", "valor": st.session_state.strategic_reserve},
@@ -152,7 +173,7 @@ elif st.session_state.step == 3:
         st.session_state.step = 4
         st.rerun()
 
-# --- DASHBOARD (Sempre visível no Step 4) ---
+# --- DASHBOARD ---
 
 elif st.session_state.step == 4:
     agora_br = datetime.now() - timedelta(hours=3)
@@ -165,12 +186,11 @@ elif st.session_state.step == 4:
         g_hj = df_l[df_l['data'].str.contains(hoje_str, na=False)]['valor'].sum()
     except: g_tot, g_hj = 0.0, 0.0
 
-    # Lógica de Parcelas
     valor_parcelas_mes = 0.0
     for p in st.session_state.installments:
         try:
             meses_decorridos = (agora_br.year - int(p['ano_inicio'])) * 12 + (agora_br.month - int(p['mes_inicio']))
-            if 0 <= meses_passados < int(p['parcelas']):
+            if 0 <= meses_decorridos < int(p['parcelas']):
                 valor_parcelas_mes += float(p['valor_total']) / int(p['parcelas'])
         except: pass
 
@@ -181,7 +201,6 @@ elif st.session_state.step == 4:
     ct_h = ((livre + g_hj) / (d_rest + 1)) - g_hj
     disponivel_total = livre + g_tot
 
-    # Interface Visual
     col1, col2 = st.columns(2)
     with col1: st.markdown(f'<div class="card"><p class="metric-label">Operacional Restante</p><p class="metric-value">{format_br(livre)}</p></div>', unsafe_allow_html=True)
     with col2: st.markdown(f'<div class="card"><p class="metric-label">Cota Restante (Hoje)</p><p class="metric-value">{format_br(ct_h)}</p></div>', unsafe_allow_html=True)
@@ -190,7 +209,6 @@ elif st.session_state.step == 4:
     with c3: st.markdown(f'<div class="card-sec"><p class="sec-label">Cota (Amanhã)</p><p class="sec-value">{format_br(livre / d_rest if d_rest > 0 else 0)}</p></div>', unsafe_allow_html=True)
     with c4: st.markdown(f'<div class="card-sec"><p class="sec-label">Fatura Atual (Cartão)</p><p class="sec-value">{format_br(valor_parcelas_mes)}</p></div>', unsafe_allow_html=True)
 
-    # Gráfico interativo
     st.markdown('<p class="metric-label" style="margin-top:25px;">Projeção de Consumo Operacional</p>', unsafe_allow_html=True)
     dias_mes = list(range(1, 32))
     projecao_sobra = [disponivel_total - (disponivel_total/30 * (d-1)) for d in dias_mes]
@@ -198,7 +216,7 @@ elif st.session_state.step == 4:
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=dias_mes, y=projecao_sobra, fill='tozeroy', mode='lines', name='Meta', line=dict(color='#F0F0F0', width=0.5), fillcolor='rgba(240, 240, 240, 0.5)', hovertemplate='Sobra Sugerida: R$ %{y:,.2f}<extra></extra>'))
     fig.add_trace(go.Bar(x=[agora_br.day], y=[livre], name='Sobra Real', marker_color='#000000', width=0.7, hovertemplate='Sobra Real: R$ %{y:,.2f}<br>Dia: %{x}<extra></extra>'))
-    fig.update_layout(height=250, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode="x unified", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',xaxis=dict(showgrid=False, tickfont=dict(size=10, color='#999'), tickvals=[1, 5, 10, 15, 20, 25, 30]), yaxis=dict(showgrid=True, gridcolor='#F5F5F5', tickfont=dict(size=10, color='#999'), tickprefix="R$ "))
+    fig.update_layout(height=250, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode="x unified", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis=dict(showgrid=False, tickfont=dict(size=10, color='#999'), tickvals=[1, 5, 10, 15, 20, 25, 30]), yaxis=dict(showgrid=True, gridcolor='#F5F5F5', tickfont=dict(size=10, color='#999'), tickprefix="R$ "))
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     with st.expander("🔍 AUDITORIA DE FLUXO", expanded=False):
