@@ -23,7 +23,7 @@ def load_lottieurl(url: str):
 
 lottie_success = load_lottieurl("https://lottie.host/5a2d67a1-94a3-4886-905c-5912389d4d03/GjX1Xl9T8y.json")
 
-# --- CSS PRECISÃO V45 ---
+# --- CSS PRECISÃO V46 ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -35,9 +35,14 @@ st.markdown("""
         text-transform: uppercase; letter-spacing: 2px; font-size: 11px;
     }
 
-    .nav-arrow-container button {
-        background-color: transparent !important; border: none !important;
-        color: #000000 !important; font-size: 32px !important; padding: 0px !important;
+    /* Twin Arrows Stealth */
+    [data-testid="stHorizontalBlock"] .nav-arrow-container button {
+        background-color: transparent !important;
+        border: none !important;
+        color: #000000 !important;
+        font-size: 32px !important;
+        padding: 0px !important;
+        line-height: 1 !important;
     }
 
     .stNumberInput input, .stTextInput input {
@@ -86,64 +91,77 @@ if st.session_state.step == 4:
     agora_br = datetime.now() - timedelta(hours=3)
     hoje_str = agora_br.strftime("%d/%m/%Y")
     
-    # 1. Carregar Gastos Variáveis do Mês
     try:
         df_l = conn.read(worksheet="Lancamentos", ttl=0)
         if not df_l.empty:
             df_l['valor'] = pd.to_numeric(df_l['valor'], errors='coerce').fillna(0)
-            g_tot = df_l['valor'].sum()
-            g_hj = df_l[df_l['data'].str.contains(hoje_str, na=False)]['valor'].sum()
+            g_tot, g_hj = df_l['valor'].sum(), df_l[df_l['data'].str.contains(hoje_str, na=False)]['valor'].sum()
         else: g_tot, g_hj = 0.0, 0.0
     except: 
         df_l = pd.DataFrame(columns=['data', 'descricao', 'valor'])
         g_tot, g_hj = 0.0, 0.0
 
-    # 2. Calcular Parcelamentos do Mês Atual
+    # --- LÓGICA SMART DE EXPIRAÇÃO DE PARCELAS ---
     valor_parcelas_mes = 0.0
     for p in st.session_state.installments:
-        # Lógica simplificada: Se a parcela ainda está ativa no mês atual
-        valor_parcelas_mes += float(p['valor_total']) / int(p['parcelas'])
+        # Calcula quantos meses se passaram desde a compra
+        try:
+            meses_decorridos = (agora_br.year - int(p['ano_inicio'])) * 12 + (agora_br.month - int(p['mes_inicio']))
+            # Se ainda está dentro do período de parcelas, soma ao custo do mês
+            if 0 <= meses_decorridos < int(p['parcelas']):
+                valor_parcelas_mes += float(p['valor_total']) / int(p['parcelas'])
+        except: pass
 
-    # 3. KPIS
     d_rest = max(31 - agora_br.day, 1)
     ti, to = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
     
-    # Liquidez real desconta as parcelas fixas que virão no cartão
     livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + ti) - to - st.session_state.investments - st.session_state.dreams - g_tot - valor_parcelas_mes
-    meta_d = (livre + g_hj) / (d_rest + 1)
-    ct_h = meta_d - g_hj
+    ct_h = ((livre + g_hj) / (d_rest + 1)) - g_hj
 
-    # --- UI ---
-    col1, col2 = st.columns(2)
-    with col1: st.markdown(f'<div class="card"><p class="metric-label">Operacional Restante</p><p class="metric-value">{format_br(livre)}</p></div>', unsafe_allow_html=True)
-    with col2: st.markdown(f'<div class="card"><p class="metric-label">Cota Restante (Hoje)</p><p class="metric-value">{format_br(ct_h)[:-3]}</p></div>', unsafe_allow_html=True)
+    # KPIs
+    c1, c2 = st.columns(2)
+    with c1: st.markdown(f'<div class="card"><p class="metric-label">Operacional Restante</p><p class="metric-value">{format_br(livre)}</p></div>', unsafe_allow_html=True)
+    with c2: st.markdown(f'<div class="card"><p class="metric-label">Cota Restante (Hoje)</p><p class="metric-value">{format_br(ct_h)[:-3]}</p></div>', unsafe_allow_html=True)
 
-    col3, col4 = st.columns(2)
-    with col3: st.markdown(f'<div class="card-sec"><p class="sec-label">Cota (Amanhã)</p><p class="sec-value">{format_br(livre / d_rest if d_rest > 0 else 0)}</p></div>', unsafe_allow_html=True)
-    with col4: st.markdown(f'<div class="card-sec"><p class="sec-label">Comprometido Cartão</p><p class="sec-value">{format_br(valor_parcelas_mes)}</p></div>', unsafe_allow_html=True)
+    c3, c4 = st.columns(2)
+    with c3: st.markdown(f'<div class="card-sec"><p class="sec-label">Cota (Amanhã)</p><p class="sec-value">{format_br(livre / d_rest if d_rest > 0 else 0)}</p></div>', unsafe_allow_html=True)
+    with col4: st.markdown(f'<div class="card-sec"><p class="sec-label">Fatura Atual (Cartão)</p><p class="sec-value">{format_br(valor_parcelas_mes)}</p></div>', unsafe_allow_html=True)
 
-    # --- NOVIDADE: GESTÃO DE PASSIVOS (PARCELAS) ---
+    # --- GESTÃO DE PARCELAMENTOS (COM SMART SAVE) ---
     with st.expander("💳 GESTÃO DE PARCELAMENTOS", expanded=False):
         c_p1, c_p2, c_p3 = st.columns([2, 1, 1])
         p_d = c_p1.text_input("DESCRIÇÃO COMPRA")
         p_v = c_p2.number_input("VALOR TOTAL", min_value=0.0)
         p_n = c_p3.number_input("Nº PARCELAS", 1, 48, 12)
         if st.button("REGISTRAR PARCELAMENTO"):
-            st.session_state.installments.append({"descricao": p_d, "valor_total": p_v, "parcelas": p_n, "mes_inicio": agora_br.month})
+            # Salva o mês E o ano de início para a conta temporal funcionar
+            st.session_state.installments.append({
+                "descricao": p_d, 
+                "valor_total": p_v, 
+                "parcelas": p_n, 
+                "mes_inicio": agora_br.month,
+                "ano_inicio": agora_br.year
+            })
             conn.update(worksheet="Parcelas", data=pd.DataFrame(st.session_state.installments))
             st.rerun()
         
         if st.session_state.installments:
             st.markdown("---")
             for idx, p in enumerate(st.session_state.installments):
-                cp1, cp2 = st.columns([0.9, 0.1])
-                cp1.markdown(f"**{p['descricao']}** • {p['parcelas']}x de {format_br(float(p['valor_total'])/int(p['parcelas']))}")
-                if cp2.button("✕", key=f"del_p_{idx}"):
-                    st.session_state.installments.pop(idx)
-                    conn.update(worksheet="Parcelas", data=pd.DataFrame(st.session_state.installments))
-                    st.rerun()
+                meses_passados = (agora_br.year - int(p['ano_inicio'])) * 12 + (agora_br.month - int(p['mes_inicio']))
+                parcela_atual = meses_passados + 1
+                
+                if 0 <= meses_passados < int(p['parcelas']):
+                    cp1, cp2 = st.columns([0.9, 0.1])
+                    cp1.markdown(f"**{p['descricao']}** • Parcela {parcela_atual}/{p['parcelas']} de {format_br(float(p['valor_total'])/int(p['parcelas']))}")
+                    if cp2.button("✕", key=f"del_p_{idx}"):
+                        st.session_state.installments.pop(idx)
+                        conn.update(worksheet="Parcelas", data=pd.DataFrame(st.session_state.installments))
+                        st.rerun()
+                else:
+                    st.markdown(f"<p style='color:#CCC; font-size:10px;'>{p['descricao']} (Finalizado)</p>", unsafe_allow_html=True)
 
-    # --- REGISTRO E EDIÇÃO DE GASTOS ---
+    # --- GESTÃO DE GASTOS (COM EXCLUSÃO) ---
     with st.expander("📝 REGISTRAR OU EDITAR GASTOS", expanded=False):
         c_l1, c_l2 = st.columns([2, 1])
         l_d, l_v = c_l1.text_input("DESCRIÇÃO GASTO"), c_l2.number_input("VALOR GASTO", min_value=0.0)
@@ -157,12 +175,10 @@ if st.session_state.step == 4:
 
         if not df_l.empty:
             st.markdown("---")
-            st.markdown('<p class="setup-step">ÚLTIMOS LANÇAMENTOS (CLIQUE NO ✕ PARA EXCLUIR)</p>', unsafe_allow_html=True)
             for idx, r in df_l.tail(5).iloc[::-1].iterrows():
                 row_c1, row_c2 = st.columns([0.9, 0.1])
                 row_c1.markdown(f"""<div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 10px 0; font-size:12px;"><span>{r['descricao']}</span><span>{format_br(r['valor'])}</span></div>""", unsafe_allow_html=True)
                 if row_c2.button("✕", key=f"del_l_{idx}"):
-                    # Deleta a linha específica do DataFrame e atualiza o GSheets
                     df_l = df_l.drop(idx)
                     conn.update(worksheet="Lancamentos", data=df_l)
                     st.rerun()
