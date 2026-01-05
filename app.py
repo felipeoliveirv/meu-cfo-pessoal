@@ -23,26 +23,33 @@ def load_lottieurl(url: str):
 
 lottie_success = load_lottieurl("https://lottie.host/5a2d67a1-94a3-4886-905c-5912389d4d03/GjX1Xl9T8y.json")
 
-# --- CSS ULTRA-MINIMALISTA (REFINADO) ---
+# --- CSS ULTRA-MINIMALISTA (NAV STEALTH) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #FFFFFF; color: #000; }
     
-    /* Botão Principal */
     .stButton>button { 
         width: 100%; background-color: #000 !important; color: #FFF !important; 
         border-radius: 0px; padding: 14px; font-weight: 800; border: none; 
         text-transform: uppercase; letter-spacing: 2px; font-size: 11px;
     }
 
-    /* Navegação Twin-Arrows Stealth */
+    /* Twin Arrows ULTRA-STEALTH (Sem fundo, sem borda) */
     .nav-btn>div>button {
-        background: transparent !important; border: none !important; box-shadow: none !important;
-        color: #000 !important; font-size: 28px !important; width: auto !important;
-        padding: 0 10px !important; margin: 0 !important; line-height: 1 !important;
+        background: transparent !important; 
+        border: none !important; 
+        box-shadow: none !important;
+        color: #000 !important; 
+        font-size: 32px !important; 
+        width: auto !important;
+        height: auto !important;
+        padding: 0 10px !important; 
+        margin: 0 !important; 
+        line-height: 1 !important;
     }
-    .nav-btn>div>button:hover { color: #888 !important; }
+    .nav-btn>div>button:hover { color: #888 !important; background: transparent !important; }
+    .nav-btn>div>button:active { background: transparent !important; }
 
     .stNumberInput input, .stTextInput input {
         border: none !important; border-bottom: 1px solid #000 !important;
@@ -76,7 +83,7 @@ try:
                 if row['parametro'] == 'investimento': st.session_state.investments = float(row['valor'])
                 if row['parametro'] == 'sonhos': st.session_state.dreams = float(row['valor'])
             
-            # Recupera a Timeline
+            # Recupera a Timeline Detalhada
             inc_df = conn.read(worksheet="Receitas", ttl=0)
             if not inc_df.empty: st.session_state.incomes = inc_df.to_dict('records')
             
@@ -93,7 +100,7 @@ if st.session_state.show_anim and lottie_success:
     st.session_state.show_anim = False
     st.rerun()
 
-# --- NAVEGAÇÃO TWIN ARROWS (ULTRA-STEALTH) ---
+# --- NAVEGAÇÃO TWIN ARROWS (STEALTH MODE) ---
 if 0 < st.session_state.step < 4:
     c_nav1, c_nav2, _ = st.columns([0.4, 0.4, 9.2])
     with c_nav1:
@@ -105,7 +112,7 @@ if 0 < st.session_state.step < 4:
         if st.button("→", key="next"): st.session_state.step += 1; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- SETUP ---
+# --- FLUXO DE SETUP ---
 if st.session_state.step == 0:
     st.markdown('<p class="setup-step">01_LIQUIDEZ</p>', unsafe_allow_html=True)
     v_t = st.number_input("SALDO ATUAL", min_value=0.0, format="%.2f", value=st.session_state.opening_balance)
@@ -153,12 +160,12 @@ elif st.session_state.step == 3:
                 if st.session_state.incomes: conn.update(worksheet="Receitas", data=pd.DataFrame(st.session_state.incomes))
                 if st.session_state.expenses: conn.update(worksheet="Custos", data=pd.DataFrame(st.session_state.expenses))
                 st.session_state.step = 4; st.session_state.show_anim = True; st.rerun()
-            except: st.error("Erro ao salvar abas 'Receitas' ou 'Custos'.")
+            except: st.error("Erro de sincronização. Verifique as abas.")
 
 # --- DASHBOARD ---
 elif st.session_state.step == 4:
     st.markdown('<p class="setup-step">VISÃO ANALÍTICA CFO.</p>', unsafe_allow_html=True)
-    agora_br = datetime.now() - timedelta(hours=3) # Joinville-BRT
+    agora_br = datetime.now() - timedelta(hours=3) # Joinville
     hoje_str = agora_br.strftime("%d/%m/%Y")
     
     g_tot, g_hj = 0.0, 0.0
@@ -170,8 +177,7 @@ elif st.session_state.step == 4:
             g_hj = df_l[df_l['data'].str.contains(hoje_str, na=False)]['valor'].sum()
     except: df_l = pd.DataFrame(columns=['data', 'descricao', 'valor'])
 
-    dias_no_mes = 31
-    d_rest = max(dias_no_mes - agora_br.day, 1)
+    dias_restantes = max(31 - agora_br.day, 1)
     dias = np.arange(1, 32)
     s_d = []
     cx = st.session_state.opening_balance - st.session_state.investments - st.session_state.dreams - g_tot
@@ -182,15 +188,19 @@ elif st.session_state.step == 4:
             if e['date'] == d: cx -= e['val']
         s_d.append(cx)
 
+    # GRÁFICO (PURO: SEM TRACE 0)
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=dias, y=[v/1000 for v in s_d], mode='lines', line=dict(color='black', width=3), hovertemplate='Saldo: %{customdata}<extra></extra>', customdata=[format_br(v) for v in s_d]))
+    fig.add_trace(go.Scatter(x=dias, y=[v/1000 for v in s_d], mode='lines', 
+                             line=dict(color='black', width=3), 
+                             hovertemplate='Saldo: %{customdata}<extra></extra>', # Oculta trace name
+                             customdata=[format_br(v) for v in s_d]))
     fig.add_hline(y=st.session_state.strategic_reserve/1000, line_dash="dash", line_color="#CCC")
     fig.update_layout(plot_bgcolor='white', paper_bgcolor='white', height=250, margin=dict(l=0, r=0, t=10, b=0), xaxis=dict(showgrid=False), yaxis=dict(gridcolor='#F9F9F9', tickformat='.0f', ticksuffix='k'), showlegend=False)
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     ti, to = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
     livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + ti) - to - st.session_state.investments - st.session_state.dreams - g_tot
-    meta_d = (livre + g_hj) / (d_rest + 1)
+    meta_d = (livre + g_hj) / (dias_restantes + 1)
     ct_h = meta_d - g_hj
 
     col1, col2 = st.columns(2)
@@ -221,6 +231,8 @@ elif st.session_state.step == 4:
 
         if not df_l.empty:
             st.markdown("---")
+            st.markdown('<p style="font-size:10px; color:#888; letter-spacing: 2px;">ÚLTIMOS LANÇAMENTOS:</p>', unsafe_allow_html=True)
+            # Tabela Estilo Auditoria
             l_html = '<div style="font-size: 11px; color: #666; font-family: \'Inter\'; letter-spacing: 0.5px;">'
             for _, r in df_l.tail(5).iloc[::-1].iterrows():
                 l_html += f'<div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>{r["descricao"]}</span><span>{format_br(r["valor"])}</span></div>'
