@@ -3,7 +3,6 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
-import requests
 from datetime import datetime, timedelta
 
 # --- CONFIGURAÇÃO CFO. ---
@@ -13,7 +12,7 @@ def format_br(val):
     if val is None: return "R$ 0,00"
     return "R$ {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- CSS PRECISÃO V52.0 ---
+# --- CSS PRECISÃO V53.0 ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -25,7 +24,6 @@ st.markdown("""
         text-transform: uppercase; letter-spacing: 2px; font-size: 11px;
     }
 
-    /* Botão de Voltar Discreto */
     div[data-testid="stColumn"]:nth-child(1) .stButton>button {
         background-color: transparent !important; color: #BBB !important;
         border: 1px solid #EEE !important; font-size: 16px !important;
@@ -41,22 +39,19 @@ st.markdown("""
     .metric-label { font-size: 10px; color: #999; letter-spacing: 3px; text-transform: uppercase; font-weight: 600; }
     .metric-value { font-size: 36px; font-weight: 800; margin-top: 5px; letter-spacing: normal; line-height: 1.1; color: #000; display: block; }
     
-    .sec-label { font-size: 9px; color: #BBB; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; }
-    .sec-value { font-size: 22px; font-weight: 700; color: #444; margin-top: 2px; }
-    
     .audit-card { background: #F9F9F9; padding: 15px; border-left: 3px solid #000; margin-bottom: 5px; font-size: 12px; }
     .card { padding: 25px 0; border-bottom: 1px solid #EEE; margin-bottom: 5px; }
     .card-sec { padding: 15px 0; border-bottom: 1px solid #F5F5F5; margin-bottom: 10px; }
-    .hist-item { display: flex; justify-content: space-between; border-bottom: 1px solid #F0F0F0; padding: 8px 0; font-size: 12px; color: #555; }
+    .hist-item { display: flex; justify-content: space-between; border-bottom: 1px solid #F0F0F0; padding: 10px 0; font-size: 12px; color: #555; }
     #MainMenu, footer, header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
 # --- ENGINE ---
-keys = ['step', 'opening_balance', 'strategic_reserve', 'incomes', 'expenses', 'investments', 'dreams', 'installments', 'reset_mode']
+keys = ['step', 'opening_balance', 'strategic_reserve', 'incomes', 'expenses', 'investments', 'dreams', 'cc_bill', 'cc_due_day', 'reset_mode']
 for key in keys:
     if key not in st.session_state:
-        st.session_state[key] = [] if key in ['incomes', 'expenses', 'installments'] else (0 if key == 'step' else 0.0)
+        st.session_state[key] = [] if key in ['incomes', 'expenses'] else (0 if key == 'step' else 0.0)
 
 # --- CONEXÃO ---
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -70,10 +65,10 @@ if st.session_state.step == 0 and not st.session_state.reset_mode:
                 if row['parametro'] == 'reserva': st.session_state.strategic_reserve = float(row['valor'])
                 if row['parametro'] == 'investimento': st.session_state.investments = float(row['valor'])
                 if row['parametro'] == 'sonhos': st.session_state.dreams = float(row['valor'])
+                if row['parametro'] == 'fatura_cc': st.session_state.cc_bill = float(row['valor'])
+                if row['parametro'] == 'vencimento_cc': st.session_state.cc_due_day = int(row['valor'])
             st.session_state.incomes = conn.read(worksheet="Receitas", ttl=0).to_dict('records')
             st.session_state.expenses = conn.read(worksheet="Custos", ttl=0).to_dict('records')
-            try: st.session_state.installments = conn.read(worksheet="Parcelas", ttl=0).to_dict('records')
-            except: pass
             st.session_state.step = 4
     except: pass
 
@@ -81,56 +76,63 @@ st.markdown('<p class="brand-header">CFO.</p>', unsafe_allow_html=True)
 
 # --- FLUXO DE REVISÃO ---
 if st.session_state.step == 0:
-    st.markdown('<p class="setup-step">Revisão 01/04</p>', unsafe_allow_html=True)
+    st.markdown('<p class="setup-step">Revisão 01/05</p>', unsafe_allow_html=True)
     st.markdown('### Saldo bancário atual')
-    val = st.number_input("R$ Saldo", value=st.session_state.opening_balance, step=100.0, label_visibility="collapsed")
-    if st.button("PRÓXIMO"):
-        st.session_state.opening_balance = val
-        st.session_state.step = 1
-        st.rerun()
+    st.session_state.opening_balance = st.number_input("R$", value=st.session_state.opening_balance, step=100.0, label_visibility="collapsed")
+    if st.button("PRÓXIMO"): st.session_state.step = 1; st.rerun()
 
 elif st.session_state.step == 1:
-    st.markdown('<p class="setup-step">Revisão 02/04</p>', unsafe_allow_html=True)
+    st.markdown('<p class="setup-step">Revisão 02/05</p>', unsafe_allow_html=True)
     st.markdown('### Reservas e Investimentos')
-    res = st.number_input("Reserva Blindada", value=st.session_state.strategic_reserve, step=100.0)
-    inv = st.number_input("Investimentos", value=st.session_state.investments, step=100.0)
-    drm = st.number_input("Sonhos", value=st.session_state.dreams, step=100.0)
-    c_btn1, c_btn2 = st.columns([0.2, 0.8])
-    if c_btn1.button("←"): st.session_state.step = 0; st.rerun()
-    if c_btn2.button("PRÓXIMO"):
-        st.session_state.strategic_reserve, st.session_state.investments, st.session_state.dreams = res, inv, drm
-        st.session_state.step = 2; st.rerun()
+    st.session_state.strategic_reserve = st.number_input("Reserva Blindada", value=st.session_state.strategic_reserve, step=100.0)
+    st.session_state.investments = st.number_input("Investimentos", value=st.session_state.investments, step=100.0)
+    st.session_state.dreams = st.number_input("Sonhos", value=st.session_state.dreams, step=100.0)
+    c1, c2 = st.columns([0.2, 0.8])
+    if c1.button("←"): st.session_state.step = 0; st.rerun()
+    if c2.button("PRÓXIMO"): st.session_state.step = 2; st.rerun()
 
 elif st.session_state.step == 2:
-    st.markdown('<p class="setup-step">Revisão 03/04</p>', unsafe_allow_html=True)
-    st.markdown('### Receitas')
-    with st.form("f_inc", clear_on_submit=True):
-        c1, c2 = st.columns([2, 1])
-        d, v = c1.text_input("Descrição"), c2.number_input("Valor", min_value=0.0)
-        if st.form_submit_button("ADICIONAR"): st.session_state.incomes.append({"desc": d, "val": v}); st.rerun()
-    for idx, i in enumerate(st.session_state.incomes):
-        col1, col2 = st.columns([0.9, 0.1])
-        col1.write(f"✅ {i['desc']}: {format_br(i['val'])}")
-        if col2.button("✕", key=f"d_inc_{idx}"): st.session_state.incomes.pop(idx); st.rerun()
-    c_btn1, c_btn2 = st.columns([0.2, 0.8])
-    if c_btn1.button("←"): st.session_state.step = 1; st.rerun()
-    if c_btn2.button("PRÓXIMO"): st.session_state.step = 3; st.rerun()
+    st.markdown('<p class="setup-step">Revisão 03/05</p>', unsafe_allow_html=True)
+    st.markdown('### Cartão de Crédito')
+    st.session_state.cc_bill = st.number_input("Valor da Fatura Prevista (R$)", value=st.session_state.cc_bill, step=50.0)
+    st.session_state.cc_due_day = st.number_input("Dia do Vencimento", value=int(st.session_state.cc_due_day) if st.session_state.cc_due_day > 0 else 10, min_value=1, max_value=31)
+    c1, c2 = st.columns([0.2, 0.8])
+    if c1.button("←"): st.session_state.step = 1; st.rerun()
+    if c2.button("PRÓXIMO"): st.session_state.step = 3; st.rerun()
 
 elif st.session_state.step == 3:
-    st.markdown('<p class="setup-step">Revisão 04/04</p>', unsafe_allow_html=True)
-    st.markdown('### Custos Fixos')
-    with st.form("f_exp", clear_on_submit=True):
-        c1, c2 = st.columns([2, 1])
-        d, v = c1.text_input("Descrição"), c2.number_input("Valor", min_value=0.0)
-        if st.form_submit_button("ADICIONAR"): st.session_state.expenses.append({"desc": d, "val": v}); st.rerun()
-    for idx, e in enumerate(st.session_state.expenses):
-        col1, col2 = st.columns([0.9, 0.1])
-        col1.write(f"❌ {e['desc']}: {format_br(e['val'])}")
-        if col2.button("✕", key=f"d_exp_{idx}"): st.session_state.expenses.pop(idx); st.rerun()
-    c_btn1, c_btn2 = st.columns([0.2, 0.8])
-    if c_btn1.button("←"): st.session_state.step = 2; st.rerun()
-    if c_btn2.button("FINALIZAR"):
-        conn.update(worksheet="Config", data=pd.DataFrame([{"parametro": "saldo_inicial", "valor": st.session_state.opening_balance},{"parametro": "reserva", "valor": st.session_state.strategic_reserve},{"parametro": "investimento", "valor": st.session_state.investments},{"parametro": "sonhos", "valor": st.session_state.dreams}]))
+    st.markdown('<p class="setup-step">Revisão 04/05</p>', unsafe_allow_html=True)
+    st.markdown('### Receitas e Custos Fixos')
+    with st.expander("Gerenciar Receitas", expanded=True):
+        with st.form("f_inc", clear_on_submit=True):
+            d, v = st.text_input("Descrição"), st.number_input("Valor", min_value=0.0)
+            if st.form_submit_button("ADD"): st.session_state.incomes.append({"desc": d, "val": v}); st.rerun()
+        for idx, i in enumerate(st.session_state.incomes):
+            col = st.columns([0.9, 0.1])
+            col[0].write(f"✅ {i['desc']}: {format_br(i['val'])}")
+            if col[1].button("✕", key=f"d_inc_{idx}"): st.session_state.incomes.pop(idx); st.rerun()
+
+    with st.expander("Gerenciar Custos Fixos", expanded=False):
+        with st.form("f_exp", clear_on_submit=True):
+            d, v = st.text_input("Descrição"), st.number_input("Valor", min_value=0.0)
+            if st.form_submit_button("ADD"): st.session_state.expenses.append({"desc": d, "val": v}); st.rerun()
+        for idx, e in enumerate(st.session_state.expenses):
+            col = st.columns([0.9, 0.1])
+            col[0].write(f"❌ {e['desc']}: {format_br(e['val'])}")
+            if col[1].button("✕", key=f"d_exp_{idx}"): st.session_state.expenses.pop(idx); st.rerun()
+
+    c1, c2 = st.columns([0.2, 0.8])
+    if c1.button("←"): st.session_state.step = 2; st.rerun()
+    if c2.button("FINALIZAR ESTRATÉGIA"):
+        data_config = pd.DataFrame([
+            {"parametro": "saldo_inicial", "valor": st.session_state.opening_balance},
+            {"parametro": "reserva", "valor": st.session_state.strategic_reserve},
+            {"parametro": "investimento", "valor": st.session_state.investments},
+            {"parametro": "sonhos", "valor": st.session_state.dreams},
+            {"parametro": "fatura_cc", "valor": st.session_state.cc_bill},
+            {"parametro": "vencimento_cc", "valor": st.session_state.cc_due_day}
+        ])
+        conn.update(worksheet="Config", data=data_config)
         conn.update(worksheet="Receitas", data=pd.DataFrame(st.session_state.incomes))
         conn.update(worksheet="Custos", data=pd.DataFrame(st.session_state.expenses))
         st.session_state.step = 4; st.rerun()
@@ -147,11 +149,11 @@ elif st.session_state.step == 4:
         g_hj = df_l[df_l['data'].str.contains(hoje_str, na=False)]['valor'].sum()
     except: g_tot, g_hj, df_l = 0.0, 0.0, pd.DataFrame(columns=['data', 'descricao', 'valor'])
 
-    # Lógica de Dash
-    valor_parcelas_mes = sum(float(p['valor_total'])/int(p['parcelas']) for p in st.session_state.installments if 0 <= (agora_br.year - int(p['ano_inicio']))*12 + (agora_br.month - int(p['mes_inicio'])) < int(p['parcelas']))
     d_rest = max(31 - agora_br.day, 1)
     ti, to = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
-    livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + ti) - to - st.session_state.investments - st.session_state.dreams - g_tot - valor_parcelas_mes
+    
+    # Cálculos CFO.
+    livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + ti) - to - st.session_state.investments - st.session_state.dreams - g_tot - st.session_state.cc_bill
     ct_h = ((livre + g_hj) / (d_rest + 1)) - g_hj
 
     col1, col2 = st.columns(2)
@@ -160,30 +162,32 @@ elif st.session_state.step == 4:
 
     c3, c4 = st.columns(2)
     with c3: st.markdown(f'<div class="card-sec"><p class="sec-label">Cota (Amanhã)</p><p class="sec-value">{format_br(livre / d_rest if d_rest > 0 else 0)}</p></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="card-sec"><p class="sec-label">Fatura Atual (Cartão)</p><p class="sec-value">{format_br(valor_parcelas_mes)}</p></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="card-sec"><p class="sec-label">Fatura Prevista</p><p class="sec-value">{format_br(st.session_state.cc_bill)}</p></div>', unsafe_allow_html=True)
 
     # Gráfico
-    st.markdown('<p class="metric-label" style="margin-top:25px;">Projeção de Consumo</p>', unsafe_allow_html=True)
+    st.markdown('<p class="metric-label" style="margin-top:25px;">Performance Mensal</p>', unsafe_allow_html=True)
     dias = list(range(1, 32))
     proj = [(livre+g_tot) - ((livre+g_tot)/30 * (d-1)) for d in dias]
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=dias, y=proj, fill='tozeroy', mode='lines', line=dict(color='#F0F0F0', width=0.5), fillcolor='rgba(240, 240, 240, 0.5)', hovertemplate='Sugestão: R$ %{y:,.2f}<extra></extra>'))
     fig.add_trace(go.Bar(x=[agora_br.day], y=[livre], marker_color='#000', width=0.7, hovertemplate='Real: R$ %{y:,.2f}<extra></extra>'))
-    fig.update_layout(height=250, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode="x unified", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis=dict(showgrid=False, tickfont=dict(size=10, color='#999'), tickvals=[1, 5, 10, 15, 20, 25, 30]), yaxis=dict(showgrid=True, gridcolor='#F5F5F5', tickfont=dict(size=10, color='#999'), tickprefix="R$ "))
+    fig.update_layout(height=250, margin=dict(l=0, r=0, t=20, b=0), showlegend=False, hovermode="x unified", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis=dict(showgrid=False, tickfont=dict(size=10, color='#999'), tickvals=[1, 10, 20, 30]), yaxis=dict(showgrid=True, gridcolor='#F5F5F5', tickfont=dict(size=10, color='#999'), tickprefix="R$ "))
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     with st.expander("🔍 AUDITORIA DE FLUXO", expanded=False):
-        st.markdown(f'<div class="audit-card">💰 <b>Saldo Inicial:</b> {format_br(st.session_state.opening_balance)}</div><div class="audit-card">🛡️ <b>Reserva:</b> - {format_br(st.session_state.strategic_reserve)}</div><div class="audit-card">📈 <b>Receitas:</b> + {format_br(ti)}</div><div class="audit-card">📉 <b>Custos Fixos:</b> - {format_br(to)}</div><div class="audit-card">💳 <b>Fatura:</b> - {format_br(valor_parcelas_mes)}</div><div class="audit-card" style="background:#000; color:#FFF;"><b>DISPONÍVEL TOTAL:</b> {format_br(livre + g_tot)}</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="audit-card">💰 <b>Saldo Inicial:</b> {format_br(st.session_state.opening_balance)}</div>
+        <div class="audit-card">🛡️ <b>Reserva:</b> - {format_br(st.session_state.strategic_reserve)}</div>
+        <div class="audit-card">📈 <b>Receitas:</b> + {format_br(ti)}</div>
+        <div class="audit-card">📉 <b>Custos Fixos:</b> - {format_br(to)}</div>
+        <div class="audit-card">💳 <b>Fatura Cartão:</b> - {format_br(st.session_state.cc_bill)}</div>
+        <div class="audit-card" style="background:#000; color:#FFF;"><b>DISPONÍVEL TOTAL:</b> {format_br(livre + g_tot)}</div>
+        """, unsafe_allow_html=True)
 
-    with st.expander("💳 GESTÃO DE PARCELAMENTOS", expanded=False):
-        c_p1, c_p2, c_p3 = st.columns([2, 1, 1])
-        p_d, p_v, p_n = c_p1.text_input("Compra"), c_p2.number_input("Total", min_value=0.0, key="p_v"), c_p3.number_input("Parc.", 1, 48, 12, key="p_n")
-        if st.button("REGISTRAR PARCELAMENTO"): st.session_state.installments.append({"descricao": p_d, "valor_total": p_v, "parcelas": p_n, "mes_inicio": agora_br.month, "ano_inicio": agora_br.year}); conn.update(worksheet="Parcelas", data=pd.DataFrame(st.session_state.installments)); st.rerun()
-
-    # --- HISTÓRICO DE GASTOS DIÁRIOS (ADICIONADO) ---
-    with st.expander("📝 REGISTRAR OU EDITAR GASTOS", expanded=False):
+    # --- HISTÓRICO DE GASTOS DIÁRIOS ---
+    with st.expander("📝 REGISTRAR OU EDITAR GASTOS", expanded=True):
         c_l1, c_l2 = st.columns([2, 1])
-        l_d, l_v = c_l1.text_input("O que comprou?"), c_l2.number_input("Quanto?", min_value=0.0, key="g_v")
+        l_d, l_v = c_l1.text_input("Descrição"), c_l2.number_input("Valor", min_value=0.0, key="g_val")
         if st.button("LANÇAR GASTO"):
             st.cache_data.clear()
             f_l = conn.read(worksheet="Lancamentos", ttl=0)
@@ -192,19 +196,13 @@ elif st.session_state.step == 4:
             conn.update(worksheet="Lancamentos", data=final); st.rerun()
 
         if not df_l.empty:
-            st.markdown(f'<p class="metric-label" style="margin-top:15px;">Gastos de Hoje ({hoje_str})</p>', unsafe_allow_html=True)
-            df_hj_list = df_l[df_l['data'].str.contains(hoje_str, na=False)]
-            if not df_hj_list.empty:
-                for idx, r in df_hj_list.iloc[::-1].iterrows():
-                    row_c1, row_c2 = st.columns([0.9, 0.1])
-                    row_c1.markdown(f'<div class="hist-item"><span>{r["descricao"]}</span><b>{format_br(r["valor"])}</b></div>', unsafe_allow_html=True)
-                    if row_c2.button("✕", key=f"del_h_{idx}"): df_l = df_l.drop(idx); conn.update(worksheet="Lancamentos", data=df_l); st.rerun()
-            else: st.info("Nenhum gasto lançado hoje.")
-
-            with st.expander("Ver Histórico Completo", expanded=False):
-                for idx, r in df_l.tail(15).iloc[::-1].iterrows():
-                    row_c1, row_c2 = st.columns([0.9, 0.1])
-                    row_c1.markdown(f'<div class="hist-item"><span style="font-size:10px; color:#AAA;">{r["data"]}</span><span>{r["descricao"]}</span><b>{format_br(r["valor"])}</b></div>', unsafe_allow_html=True)
-                    if row_c2.button("✕", key=f"del_all_{idx}"): df_l = df_l.drop(idx); conn.update(worksheet="Lancamentos", data=df_l); st.rerun()
+            st.markdown(f'<p class="metric-label" style="margin-top:15px;">Hoje ({hoje_str})</p>', unsafe_allow_html=True)
+            df_hj = df_l[df_l['data'].str.contains(hoje_str, na=False)]
+            for idx, r in df_hj.iloc[::-1].iterrows():
+                row = st.columns([0.9, 0.1])
+                row[0].markdown(f'<div class="hist-item"><span>{r["descricao"]}</span><b>{format_br(r["valor"])}</b></div>', unsafe_allow_html=True)
+                if row[1].button("✕", key=f"del_h_{idx}"): 
+                    df_l = df_l.drop(idx)
+                    conn.update(worksheet="Lancamentos", data=df_l); st.rerun()
 
     if st.button("REDEFINIR ESTRATÉGIA"): st.session_state.step = 0; st.session_state.reset_mode = True; st.rerun()
