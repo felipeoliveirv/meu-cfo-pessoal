@@ -13,7 +13,7 @@ def format_br(val):
     if val is None: return "R$ 0,00"
     return "R$ {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- CSS PRECISÃO V46.1 ---
+# --- CSS PRECISÃO V47.0 (MÁXIMO MINIMALISMO) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -41,6 +41,9 @@ st.markdown("""
     .card { padding: 25px 0; border-bottom: 1px solid #EEE; margin-bottom: 5px; }
     .card-sec { padding: 15px 0; border-bottom: 1px solid #F5F5F5; margin-bottom: 10px; }
     #MainMenu, footer, header {visibility: hidden;}
+    
+    /* Ajuste para remover espaçamentos extras do Streamlit */
+    .block-container { padding-top: 2rem; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -98,6 +101,7 @@ if st.session_state.step == 4:
     d_rest = max(31 - agora_br.day, 1)
     ti, to = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
     
+    # Cálculos cruciais
     livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + ti) - to - st.session_state.investments - st.session_state.dreams - g_tot - valor_parcelas_mes
     ct_h = ((livre + g_hj) / (d_rest + 1)) - g_hj
 
@@ -111,28 +115,60 @@ if st.session_state.step == 4:
     with c3: st.markdown(f'<div class="card-sec"><p class="sec-label">Cota (Amanhã)</p><p class="sec-value">{format_br(livre / d_rest if d_rest > 0 else 0)}</p></div>', unsafe_allow_html=True)
     with c4: st.markdown(f'<div class="card-sec"><p class="sec-label">Fatura Atual (Cartão)</p><p class="sec-value">{format_br(valor_parcelas_mes)}</p></div>', unsafe_allow_html=True)
 
-    # --- NOVO: SEÇÃO DE AUDITORIA (RESTAURADA) ---
-    with st.expander("🔍 AUDITORIA DE FLUXO ESTRATÉGICO", expanded=False):
+    # --- GRÁFICO DE EVOLUÇÃO (VERSÃO CLEAN/MINIMALISTA) ---
+    st.markdown('<p class="metric-label" style="margin-top:20px;">Performance Mensal (Meta vs Realizado)</p>', unsafe_allow_html=True)
+    
+    dias = list(range(1, 32))
+    orcamento_total = livre + g_tot
+    # Linha de queima ideal (começa no total e vai a zero)
+    linha_meta = [orcamento_total - (orcamento_total/30 * (d-1)) for d in dias]
+    
+    fig = go.Figure()
+
+    # Linha da Meta (Cinza claro, discreta)
+    fig.add_trace(go.Scatter(
+        x=dias, y=linha_meta, 
+        mode='lines',
+        line=dict(color='#EEEEEE', width=1, dash='dot'),
+        hoverinfo='skip'
+    ))
+
+    # Barra do Gasto Atual (Preto sólido)
+    fig.add_trace(go.Bar(
+        x=[agora_br.day], y=[livre],
+        marker_color='#000000',
+        width=0.8,
+        hoverinfo='none'
+    ))
+
+    # Layout Ultra-Minimalista
+    fig.update_layout(
+        height=120,
+        margin=dict(l=0, r=0, t=10, b=0),
+        showlegend=False,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(
+            showgrid=False, showline=False, zeroline=False, 
+            tickvals=[1, 15, 30], ticktext=['1', '15', '30'],
+            tickfont=dict(size=10, color='#CCC')
+        ),
+        yaxis=dict(showgrid=False, showline=False, zeroline=False, showticklabels=False),
+        bargap=0.1
+    )
+    
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
+    # --- AUDITORIA ---
+    with st.expander("🔍 AUDITORIA DE FLUXO", expanded=False):
         st.markdown(f"""
         <div class="audit-card">💰 <b>Saldo Inicial:</b> {format_br(st.session_state.opening_balance)}</div>
         <div class="audit-card">🛡️ <b>Reserva Blindada:</b> - {format_br(st.session_state.strategic_reserve)}</div>
         <div class="audit-card">📈 <b>Receitas Previstas:</b> + {format_br(ti)}</div>
         <div class="audit-card">📉 <b>Custos Fixos:</b> - {format_br(to)}</div>
-        <div class="audit-card">💎 <b>Invest. e Sonhos:</b> - {format_br(st.session_state.investments + st.session_state.dreams)}</div>
         <div class="audit-card">💳 <b>Fatura Estimada:</b> - {format_br(valor_parcelas_mes)}</div>
-        <div class="audit-card" style="background:#EEE;"><b>GASTO VARIÁVEL ACUMULADO:</b> {format_br(g_tot)}</div>
+        <div class="audit-card" style="background:#000; color:#FFF;"><b>DISPONÍVEL TOTAL:</b> {format_br(livre + g_tot)}</div>
         """, unsafe_allow_html=True)
-
-    # --- NOVO: GRÁFICO DE EVOLUÇÃO (RESTAURADO) ---
-    st.markdown('<p class="metric-label" style="margin-top:20px;">Performance Mensal</p>', unsafe_allow_html=True)
-    dias = list(range(1, 32))
-    # Simulação de queima de cota linear vs real
-    gasto_ideal = [livre / 30 * d for d in dias]
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=dias, y=gasto_ideal, name="Meta", line=dict(color='#EEE', width=2, dash='dot')))
-    fig.add_trace(go.Bar(x=[agora_br.day], y=[livre], name="Atual", marker_color='#000'))
-    fig.update_layout(height=200, margin=dict(l=0,r=0,t=0,b=0), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     # GESTÃO DE PARCELAMENTOS
     with st.expander("💳 GESTÃO DE PARCELAMENTOS", expanded=False):
