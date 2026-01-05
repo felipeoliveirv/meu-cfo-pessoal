@@ -23,7 +23,7 @@ def load_lottieurl(url: str):
 
 lottie_success = load_lottieurl("https://lottie.host/5a2d67a1-94a3-4886-905c-5912389d4d03/GjX1Xl9T8y.json")
 
-# --- CSS PRECISÃO E MINIMALISMO ---
+# --- CSS PRECISÃO (MVP V44) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -35,7 +35,6 @@ st.markdown("""
         text-transform: uppercase; letter-spacing: 2px; font-size: 11px;
     }
 
-    /* Navegação Stealth */
     [data-testid="stHorizontalBlock"] .nav-arrow-container button {
         background-color: transparent !important;
         border: none !important;
@@ -52,14 +51,21 @@ st.markdown("""
     
     .brand-header { font-size: 24px; font-weight: 800; letter-spacing: 6px; text-transform: uppercase; margin-bottom: 20px; border-bottom: 3px solid #000; display: inline-block; }
     .setup-step { font-size: 10px; color: #888; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; }
+    
     .metric-label { font-size: 10px; color: #999; letter-spacing: 3px; text-transform: uppercase; font-weight: 600; }
-    .metric-value { font-size: 38px; font-weight: 800; margin-top: 5px; letter-spacing: normal; line-height: 1.1; color: #000; display: block; }
-    .card { padding: 30px 0; border-bottom: 1px solid #EEE; margin-bottom: 10px; }
+    .metric-value { font-size: 36px; font-weight: 800; margin-top: 5px; letter-spacing: normal; line-height: 1.1; color: #000; display: block; }
+    
+    .sec-label { font-size: 9px; color: #BBB; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; }
+    .sec-value { font-size: 22px; font-weight: 700; color: #444; margin-top: 2px; }
+    
+    .card { padding: 25px 0; border-bottom: 1px solid #EEE; margin-bottom: 5px; }
+    .card-sec { padding: 15px 0; border-bottom: 1px solid #F5F5F5; margin-bottom: 10px; }
+    
     #MainMenu, footer, header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- ENGINE DE ESTADO ---
+# --- ENGINE ---
 keys = ['step', 'opening_balance', 'strategic_reserve', 'incomes', 'expenses', 'investments', 'dreams', 'show_anim', 'reset_mode']
 for key in keys:
     if key not in st.session_state:
@@ -103,7 +109,7 @@ if 0 < st.session_state.step < 4:
         if st.button("→", key="next"): st.session_state.step += 1; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- SETUP STEPS (0-3) ---
+# --- TELAS SETUP ---
 if st.session_state.step == 0:
     st.markdown('<p class="setup-step">01_LIQUIDEZ</p>', unsafe_allow_html=True)
     v_t = st.number_input("SALDO ATUAL", min_value=0.0, format="%.2f", value=st.session_state.opening_balance)
@@ -167,7 +173,8 @@ elif st.session_state.step == 4:
             g_hj = df_l[df_l['data'].str.contains(hoje_str, na=False)]['valor'].sum()
     except: df_l = pd.DataFrame(columns=['data', 'descricao', 'valor'])
 
-    d_rest = max(31 - agora_br.day, 1)
+    d_rest = max(31 - agora_br.day, 1) # Dias restantes excluindo hoje
+    d_total_mes = 31
     dias = np.arange(1, 32)
     s_d = []
     cx = st.session_state.opening_balance - st.session_state.investments - st.session_state.dreams - g_tot
@@ -185,7 +192,7 @@ elif st.session_state.step == 4:
     fig.update_layout(plot_bgcolor='white', paper_bgcolor='white', height=250, margin=dict(l=0, r=0, t=10, b=0), xaxis=dict(showgrid=False), yaxis=dict(gridcolor='#F9F9F9', tickformat='.0f', ticksuffix='k'), showlegend=False)
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-    # KPIS PRINCIPAIS
+    # KPIS PRIMÁRIOS (O AGORA)
     ti, to = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
     livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + ti) - to - st.session_state.investments - st.session_state.dreams - g_tot
     meta_d = (livre + g_hj) / (d_rest + 1)
@@ -195,20 +202,12 @@ elif st.session_state.step == 4:
     with col1: st.markdown(f'<div class="card"><p class="metric-label">Operacional Restante</p><p class="metric-value">{format_br(livre)}</p></div>', unsafe_allow_html=True)
     with col2: st.markdown(f'<div class="card"><p class="metric-label">Cota Restante (Hoje)</p><p class="metric-value">{format_br(ct_h)[:-3]}</p></div>', unsafe_allow_html=True)
 
-    # --- NOVIDADE: PLANEJAMENTO DE COTAS FUTURAS ---
-    with st.expander("📅 PLANEJAMENTO DE COTAS FUTURAS", expanded=True):
-        st.markdown('<p class="setup-step">PROJEÇÃO REBALANCEADA (AMANHÃ EM DIANTE)</p>', unsafe_allow_html=True)
-        # Se d_rest for 0, acabou o mês
-        cota_futura = livre / d_rest if d_rest > 0 else 0
-        
-        proj_html = '<div style="font-size: 11px; color: #666; font-family: \'Inter\'; letter-spacing: 0.5px;">'
-        for i in range(1, 8): # Próximos 7 dias
-            data_proj = agora_br + timedelta(days=i)
-            if data_proj.day > 31: break # Não passa do fim do mês
-            dia_nome = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"][data_proj.weekday()]
-            proj_html += f'<div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 10px 0;"><span>{dia_nome}, {data_proj.strftime("%d/%m")}</span><span style="color:#000; font-weight:600;">{format_br(cota_futura)}</span></div>'
-        proj_html += '</div>'
-        st.markdown(proj_html, unsafe_allow_html=True)
+    # --- NOVIDADE: KPIS SECUNDÁRIOS (PROJEÇÃO) ---
+    cota_amanha = livre / d_rest if d_rest > 0 else 0
+    
+    col3, col4 = st.columns(2)
+    with col3: st.markdown(f'<div class="card-sec"><p class="sec-label">Cota Diária (Amanhã)</p><p class="sec-value">{format_br(cota_amanha)}</p></div>', unsafe_allow_html=True)
+    with col4: st.markdown(f'<div class="card-sec"><p class="sec-label">Fôlego do Ciclo</p><p class="sec-value">{d_rest} Dias</p></div>', unsafe_allow_html=True)
 
     # AUDITORIA
     with st.expander("DETALHAMENTO E AUDITORIA", expanded=False):
