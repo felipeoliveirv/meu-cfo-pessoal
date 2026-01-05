@@ -12,7 +12,7 @@ def format_br(val):
     if val is None: return "R$ 0,00"
     return "R$ {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- CSS PRECISÃO V54.0 ---
+# --- CSS PRECISÃO V55.0 ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -62,12 +62,14 @@ if st.session_state.step == 0 and not st.session_state.reset_mode:
         config_df = conn.read(worksheet="Config", ttl=0)
         if not config_df.empty:
             for _, row in config_df.iterrows():
-                if row['parametro'] == 'saldo_inicial': st.session_state.opening_balance = float(row['valor'])
-                if row['parametro'] == 'reserva': st.session_state.strategic_reserve = float(row['valor'])
-                if row['parametro'] == 'investimento': st.session_state.investments = float(row['valor'])
-                if row['parametro'] == 'sonhos': st.session_state.dreams = float(row['valor'])
-                if row['parametro'] == 'fatura_cc': st.session_state.cc_bill = float(row['valor'])
-                if row['parametro'] == 'vencimento_cc': st.session_state.cc_due_day = int(row['valor'])
+                p = row['parametro']
+                v = row['valor']
+                if p == 'saldo_inicial': st.session_state.opening_balance = float(v)
+                if p == 'reserva': st.session_state.strategic_reserve = float(v)
+                if p == 'investimento': st.session_state.investments = float(v)
+                if p == 'sonhos': st.session_state.dreams = float(v)
+                if p == 'fatura_cc': st.session_state.cc_bill = float(v)
+                if p == 'vencimento_cc': st.session_state.cc_due_day = int(v)
             st.session_state.incomes = conn.read(worksheet="Receitas", ttl=0).to_dict('records')
             st.session_state.expenses = conn.read(worksheet="Custos", ttl=0).to_dict('records')
             st.session_state.step = 4
@@ -112,7 +114,7 @@ elif st.session_state.step == 3:
             if st.form_submit_button("ADD"): st.session_state.incomes.append({"desc": d, "val": v, "dia": dia}); st.rerun()
         for idx, i in enumerate(st.session_state.incomes):
             col = st.columns([0.9, 0.1])
-            col[0].write(f"✅ Dia {i['dia']} | {i['desc']}: {format_br(i['val'])}")
+            col[0].write(f"✅ Dia {i.get('dia', 1)} | {i['desc']}: {format_br(i['val'])}")
             if col[1].button("✕", key=f"d_inc_{idx}"): st.session_state.incomes.pop(idx); st.rerun()
 
     with st.expander("Custos Fixos (Aluguel, Luz)", expanded=False):
@@ -122,7 +124,7 @@ elif st.session_state.step == 3:
             if st.form_submit_button("ADD"): st.session_state.expenses.append({"desc": d, "val": v, "dia": dia}); st.rerun()
         for idx, e in enumerate(st.session_state.expenses):
             col = st.columns([0.9, 0.1])
-            col[0].write(f"❌ Dia {e['dia']} | {e['desc']}: {format_br(e['val'])}")
+            col[0].write(f"❌ Dia {e.get('dia', 1)} | {e['desc']}: {format_br(e['val'])}")
             if col[1].button("✕", key=f"d_exp_{idx}"): st.session_state.expenses.pop(idx); st.rerun()
 
     c1, c2 = st.columns([0.2, 0.8])
@@ -150,21 +152,24 @@ elif st.session_state.step == 4:
     ti = sum(i['val'] for i in st.session_state.incomes)
     to = sum(e['val'] for e in st.session_state.expenses)
     
-    # Lógica de Vale de Caixa (Liquidez Diária)
+    # Lógica de Vale de Caixa (Liquidez Diária) - CORRIGIDA COM .get()
     projecao_diaria = []
     saldo_simulado = st.session_state.opening_balance
-    for d in range(hoje_dia, 32):
-        # Soma o que ainda vai entrar e subtrai o que ainda vai sair a partir de hoje
-        inc_dia = sum(i['val'] for i in st.session_state.incomes if i['dia'] == d)
-        exp_dia = sum(e['val'] for e in st.session_state.expenses if e['dia'] == d)
+    for d in range(1, 32):
+        inc_dia = sum(i['val'] for i in st.session_state.incomes if i.get('dia', 1) == d)
+        exp_dia = sum(e['val'] for e in st.session_state.expenses if e.get('dia', 1) == d)
         cc_dia = st.session_state.cc_bill if d == st.session_state.cc_due_day else 0
         
         saldo_simulado = saldo_simulado + inc_dia - exp_dia - cc_dia
-        projecao_diaria.append({"dia": d, "saldo": saldo_simulado})
+        if d >= hoje_dia: # Só projetamos do hoje em diante no gráfico
+            projecao_diaria.append({"dia": d, "saldo": saldo_simulado})
     
     df_proj = pd.DataFrame(projecao_diaria)
-    menor_saldo = df_proj['saldo'].min()
-    dia_critico = df_proj.loc[df_proj['saldo'] == menor_saldo, 'dia'].values[0]
+    if not df_proj.empty:
+        menor_saldo = df_proj['saldo'].min()
+        dia_critico = df_proj.loc[df_proj['saldo'] == menor_saldo, 'dia'].values[0]
+    else:
+        menor_saldo, dia_critico = 0, hoje_dia
 
     livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + ti) - to - st.session_state.investments - st.session_state.dreams - g_tot - st.session_state.cc_bill
     d_rest = max(31 - hoje_dia, 1)
@@ -175,7 +180,7 @@ elif st.session_state.step == 4:
     with col2: st.markdown(f'<div class="card"><p class="metric-label">Cota Restante (Hoje)</p><p class="metric-value">{format_br(ct_h)}</p></div>', unsafe_allow_html=True)
 
     # Gráfico
-    st.markdown('<p class="metric-label" style="margin-top:25px;">Fluxo de Caixa Projetado (Sobra vs Dias)</p>', unsafe_allow_html=True)
+    st.markdown('<p class="metric-label" style="margin-top:25px;">Fluxo de Caixa Projetado (Liquidez)</p>', unsafe_allow_html=True)
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df_proj['dia'], y=df_proj['saldo'], fill='tozeroy', mode='lines', line=dict(color='#F0F0F0', width=0.5), fillcolor='rgba(240, 240, 240, 0.3)', name="Liquidez"))
     fig.add_trace(go.Bar(x=[hoje_dia], y=[livre], marker_color='#000', width=0.6, name="Operacional"))
@@ -183,15 +188,13 @@ elif st.session_state.step == 4:
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     with st.expander("🔍 AUDITORIA E VALE DE CAIXA", expanded=False):
-        # Card de Alerta de Liquidez
         if menor_saldo < 0:
             st.markdown(f'<div class="audit-alert">⚠️ ALERTA DE CAIXA: Seu saldo ficará negativo em {format_br(menor_saldo)} no dia {dia_critico}.</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="audit-card" style="border-left: 3px solid #2ECC71;">✅ <b>Menor Saldo Previsto:</b> {format_br(menor_saldo)} (Dia {dia_critico})</div>', unsafe_allow_html=True)
         
         st.markdown(f"""
-        <div class="audit-card">💰 <b>Saldo em Conta Hoje:</b> {format_br(st.session_state.opening_balance)}</div>
-        <div class="audit-card">🛡️ <b>Reserva Blindada:</b> - {format_br(st.session_state.strategic_reserve)}</div>
+        <div class="audit-card">💰 <b>Saldo Atual:</b> {format_br(st.session_state.opening_balance)}</div>
         <div class="audit-card">📉 <b>Total Custos Fixos:</b> - {format_br(to)}</div>
         <div class="audit-card">💳 <b>Fatura Cartão:</b> - {format_br(st.session_state.cc_bill)}</div>
         <div class="audit-card" style="background:#000; color:#FFF;"><b>DISPONÍVEL TOTAL (MÊS):</b> {format_br(livre + g_tot)}</div>
@@ -211,6 +214,8 @@ elif st.session_state.step == 4:
             for idx, r in df_hj.iloc[::-1].iterrows():
                 row = st.columns([0.9, 0.1])
                 row[0].markdown(f'<div class="hist-item"><span>{r["descricao"]}</span><b>{format_br(r["valor"])}</b></div>', unsafe_allow_html=True)
-                if row[1].button("✕", key=f"del_h_{idx}"): df_l = df_l.drop(idx); conn.update(worksheet="Lancamentos", data=df_l); st.rerun()
+                if row[1].button("✕", key=f"del_h_{idx}"): 
+                    df_l = df_l.drop(idx)
+                    conn.update(worksheet="Lancamentos", data=df_l); st.rerun()
 
     if st.button("REDEFINIR ESTRATÉGIA"): st.session_state.step = 0; st.session_state.reset_mode = True; st.rerun()
