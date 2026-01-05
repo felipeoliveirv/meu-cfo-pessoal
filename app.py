@@ -3,9 +3,7 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
-import time
 import requests
-from streamlit_lottie import st_lottie
 from datetime import datetime, timedelta
 
 # --- CONFIGURAÇÃO CFO. ---
@@ -13,15 +11,7 @@ st.set_page_config(page_title="CFO. | Operação", layout="centered")
 
 def format_br(val):
     if val is None: return "R$ 0,00"
-    return "R$  {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
-
-def load_lottieurl(url: str):
-    try:
-        r = requests.get(url, timeout=5)
-        return r.json() if r.status_code == 200 else None
-    except: return None
-
-lottie_success = load_lottieurl("https://lottie.host/5a2d67a1-94a3-4886-905c-5912389d4d03/GjX1Xl9T8y.json")
+    return "R$ {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
 
 # --- CSS PRECISÃO V46.1 ---
 st.markdown("""
@@ -35,24 +25,19 @@ st.markdown("""
         text-transform: uppercase; letter-spacing: 2px; font-size: 11px;
     }
 
-    .nav-arrow-container button {
-        background-color: transparent !important; border: none !important;
-        color: #000000 !important; font-size: 32px !important; padding: 0px !important;
-    }
-
     .stNumberInput input, .stTextInput input {
         border: none !important; border-bottom: 1px solid #000 !important;
         border-radius: 0px !important; font-size: 18px !important; font-weight: 600 !important;
     }
     
     .brand-header { font-size: 24px; font-weight: 800; letter-spacing: 6px; text-transform: uppercase; margin-bottom: 20px; border-bottom: 3px solid #000; display: inline-block; }
-    .setup-step { font-size: 10px; color: #888; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; }
     .metric-label { font-size: 10px; color: #999; letter-spacing: 3px; text-transform: uppercase; font-weight: 600; }
     .metric-value { font-size: 36px; font-weight: 800; margin-top: 5px; letter-spacing: normal; line-height: 1.1; color: #000; display: block; }
     
     .sec-label { font-size: 9px; color: #BBB; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; }
     .sec-value { font-size: 22px; font-weight: 700; color: #444; margin-top: 2px; }
     
+    .audit-card { background: #F9F9F9; padding: 15px; border-left: 3px solid #000; margin-bottom: 5px; font-size: 12px; }
     .card { padding: 25px 0; border-bottom: 1px solid #EEE; margin-bottom: 5px; }
     .card-sec { padding: 15px 0; border-bottom: 1px solid #F5F5F5; margin-bottom: 10px; }
     #MainMenu, footer, header {visibility: hidden;}
@@ -60,7 +45,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- ENGINE ---
-keys = ['step', 'opening_balance', 'strategic_reserve', 'incomes', 'expenses', 'investments', 'dreams', 'installments', 'show_anim', 'reset_mode']
+keys = ['step', 'opening_balance', 'strategic_reserve', 'incomes', 'expenses', 'investments', 'dreams', 'installments', 'reset_mode']
 for key in keys:
     if key not in st.session_state:
         st.session_state[key] = [] if key in ['incomes', 'expenses', 'installments'] else (0 if key == 'step' else 0.0)
@@ -94,13 +79,14 @@ if st.session_state.step == 4:
         df_l = conn.read(worksheet="Lancamentos", ttl=0)
         if not df_l.empty:
             df_l['valor'] = pd.to_numeric(df_l['valor'], errors='coerce').fillna(0)
-            g_tot, g_hj = df_l['valor'].sum(), df_l[df_l['data'].str.contains(hoje_str, na=False)]['valor'].sum()
+            g_tot = df_l['valor'].sum()
+            g_hj = df_l[df_l['data'].str.contains(hoje_str, na=False)]['valor'].sum()
         else: g_tot, g_hj = 0.0, 0.0
     except: 
         df_l = pd.DataFrame(columns=['data', 'descricao', 'valor'])
         g_tot, g_hj = 0.0, 0.0
 
-    # LÓGICA SMART DE PARCELAS
+    # LÓGICA DE PARCELAS
     valor_parcelas_mes = 0.0
     for p in st.session_state.installments:
         try:
@@ -120,12 +106,35 @@ if st.session_state.step == 4:
     with col1: st.markdown(f'<div class="card"><p class="metric-label">Operacional Restante</p><p class="metric-value">{format_br(livre)}</p></div>', unsafe_allow_html=True)
     with col2: st.markdown(f'<div class="card"><p class="metric-label">Cota Restante (Hoje)</p><p class="metric-value">{format_br(ct_h)}</p></div>', unsafe_allow_html=True)
 
-    # KPIs SECUNDÁRIOS (CORRIGIDO)
+    # KPIs SECUNDÁRIOS
     c3, c4 = st.columns(2)
     with c3: st.markdown(f'<div class="card-sec"><p class="sec-label">Cota (Amanhã)</p><p class="sec-value">{format_br(livre / d_rest if d_rest > 0 else 0)}</p></div>', unsafe_allow_html=True)
     with c4: st.markdown(f'<div class="card-sec"><p class="sec-label">Fatura Atual (Cartão)</p><p class="sec-value">{format_br(valor_parcelas_mes)}</p></div>', unsafe_allow_html=True)
 
-    # PARCELAMENTOS
+    # --- NOVO: SEÇÃO DE AUDITORIA (RESTAURADA) ---
+    with st.expander("🔍 AUDITORIA DE FLUXO ESTRATÉGICO", expanded=False):
+        st.markdown(f"""
+        <div class="audit-card">💰 <b>Saldo Inicial:</b> {format_br(st.session_state.opening_balance)}</div>
+        <div class="audit-card">🛡️ <b>Reserva Blindada:</b> - {format_br(st.session_state.strategic_reserve)}</div>
+        <div class="audit-card">📈 <b>Receitas Previstas:</b> + {format_br(ti)}</div>
+        <div class="audit-card">📉 <b>Custos Fixos:</b> - {format_br(to)}</div>
+        <div class="audit-card">💎 <b>Invest. e Sonhos:</b> - {format_br(st.session_state.investments + st.session_state.dreams)}</div>
+        <div class="audit-card">💳 <b>Fatura Estimada:</b> - {format_br(valor_parcelas_mes)}</div>
+        <div class="audit-card" style="background:#EEE;"><b>GASTO VARIÁVEL ACUMULADO:</b> {format_br(g_tot)}</div>
+        """, unsafe_allow_html=True)
+
+    # --- NOVO: GRÁFICO DE EVOLUÇÃO (RESTAURADO) ---
+    st.markdown('<p class="metric-label" style="margin-top:20px;">Performance Mensal</p>', unsafe_allow_html=True)
+    dias = list(range(1, 32))
+    # Simulação de queima de cota linear vs real
+    gasto_ideal = [livre / 30 * d for d in dias]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=dias, y=gasto_ideal, name="Meta", line=dict(color='#EEE', width=2, dash='dot')))
+    fig.add_trace(go.Bar(x=[agora_br.day], y=[livre], name="Atual", marker_color='#000'))
+    fig.update_layout(height=200, margin=dict(l=0,r=0,t=0,b=0), showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
+    # GESTÃO DE PARCELAMENTOS
     with st.expander("💳 GESTÃO DE PARCELAMENTOS", expanded=False):
         c_p1, c_p2, c_p3 = st.columns([2, 1, 1])
         p_d = c_p1.text_input("DESCRIÇÃO COMPRA")
