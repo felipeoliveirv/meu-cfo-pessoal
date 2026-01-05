@@ -23,44 +23,27 @@ def load_lottieurl(url: str):
 
 lottie_success = load_lottieurl("https://lottie.host/5a2d67a1-94a3-4886-905c-5912389d4d03/GjX1Xl9T8y.json")
 
-# --- CSS CORRIGIDO (FLECHAS TRANSPARENTES) ---
+# --- CSS PRECISÃO E MINIMALISMO ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #FFFFFF; color: #000; }
     
-    /* Botões de Ação (Pretos) */
     .stButton>button { 
         width: 100%; background-color: #000 !important; color: #FFF !important; 
         border-radius: 0px; padding: 14px; font-weight: 800; border: none; 
         text-transform: uppercase; letter-spacing: 2px; font-size: 11px;
     }
 
-    /* --- CORREÇÃO DEFINITIVA DAS FLECHAS --- */
-    /* Isola o container das flechas */
+    /* Navegação Stealth */
     [data-testid="stHorizontalBlock"] .nav-arrow-container button {
         background-color: transparent !important;
         border: none !important;
-        box-shadow: none !important;
-        color: #000000 !important; /* Flecha preta */
+        color: #000000 !important;
         font-size: 32px !important;
         padding: 0px !important;
         line-height: 1 !important;
-        min-height: 0px !important;
-        height: auto !important;
-        margin-top: -10px !important; /* Ajuste fino de alinhamento */
     }
-
-    /* Garante que o fundo preto NÃO volte ao passar o mouse ou clicar */
-    [data-testid="stHorizontalBlock"] .nav-arrow-container button:hover,
-    [data-testid="stHorizontalBlock"] .nav-arrow-container button:active,
-    [data-testid="stHorizontalBlock"] .nav-arrow-container button:focus {
-        background-color: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        color: #666666 !important; /* Cinza sutil ao passar o mouse */
-    }
-    /* --------------------------------------- */
 
     .stNumberInput input, .stTextInput input {
         border: none !important; border-bottom: 1px solid #000 !important;
@@ -82,7 +65,7 @@ for key in keys:
     if key not in st.session_state:
         st.session_state[key] = [] if key in ['incomes', 'expenses'] else (0 if key == 'step' else 0.0)
 
-# --- CARREGAMENTO INTEGRAL ---
+# --- CONEXÃO ---
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     if st.session_state.step == 0 and not st.session_state.reset_mode:
@@ -93,10 +76,8 @@ try:
                 if row['parametro'] == 'reserva': st.session_state.strategic_reserve = float(row['valor'])
                 if row['parametro'] == 'investimento': st.session_state.investments = float(row['valor'])
                 if row['parametro'] == 'sonhos': st.session_state.dreams = float(row['valor'])
-            
             inc_df = conn.read(worksheet="Receitas", ttl=0)
             if not inc_df.empty: st.session_state.incomes = inc_df.to_dict('records')
-            
             exp_df = conn.read(worksheet="Custos", ttl=0)
             if not exp_df.empty: st.session_state.expenses = exp_df.to_dict('records')
             st.session_state.step = 4
@@ -110,11 +91,10 @@ if st.session_state.show_anim and lottie_success:
     st.session_state.show_anim = False
     st.rerun()
 
-# --- NAVEGAÇÃO TWIN ARROWS (COM WRAPPER CORRIGIDO) ---
+# --- NAVEGAÇÃO ---
 if 0 < st.session_state.step < 4:
     c_nav1, c_nav2, _ = st.columns([0.4, 0.4, 9.2])
     with c_nav1:
-        # Wrapper específico para aplicar o CSS correto
         st.markdown('<div class="nav-arrow-container">', unsafe_allow_html=True)
         if st.button("←", key="prev"): st.session_state.step -= 1; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
@@ -123,7 +103,7 @@ if 0 < st.session_state.step < 4:
         if st.button("→", key="next"): st.session_state.step += 1; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- FLUXO DE SETUP ---
+# --- SETUP STEPS (0-3) ---
 if st.session_state.step == 0:
     st.markdown('<p class="setup-step">01_LIQUIDEZ</p>', unsafe_allow_html=True)
     v_t = st.number_input("SALDO ATUAL", min_value=0.0, format="%.2f", value=st.session_state.opening_balance)
@@ -164,19 +144,18 @@ elif st.session_state.step == 3:
     drm = st.number_input("SONHOS", format="%.2f", value=st.session_state.dreams)
     if st.button("SALVAR E FINALIZAR SETUP"):
         st.session_state.investments, st.session_state.dreams = inv, drm
-        with st.spinner("Gravando no cofre..."):
-            try:
-                df_c = pd.DataFrame([{"parametro": "saldo_inicial", "valor": st.session_state.opening_balance}, {"parametro": "reserva", "valor": st.session_state.strategic_reserve}, {"parametro": "investimento", "valor": st.session_state.investments}, {"parametro": "sonhos", "valor": st.session_state.dreams}])
-                conn.update(worksheet="Config", data=df_c)
-                if st.session_state.incomes: conn.update(worksheet="Receitas", data=pd.DataFrame(st.session_state.incomes))
-                if st.session_state.expenses: conn.update(worksheet="Custos", data=pd.DataFrame(st.session_state.expenses))
-                st.session_state.step = 4; st.session_state.show_anim = True; st.rerun()
-            except: st.error("Erro na sincronização das abas.")
+        try:
+            df_c = pd.DataFrame([{"parametro": "saldo_inicial", "valor": st.session_state.opening_balance}, {"parametro": "reserva", "valor": st.session_state.strategic_reserve}, {"parametro": "investimento", "valor": st.session_state.investments}, {"parametro": "sonhos", "valor": st.session_state.dreams}])
+            conn.update(worksheet="Config", data=df_c)
+            if st.session_state.incomes: conn.update(worksheet="Receitas", data=pd.DataFrame(st.session_state.incomes))
+            if st.session_state.expenses: conn.update(worksheet="Custos", data=pd.DataFrame(st.session_state.expenses))
+            st.session_state.step = 4; st.session_state.show_anim = True; st.rerun()
+        except: st.error("Erro na sincronização.")
 
-# --- DASHBOARD ---
+# --- DASHBOARD (OPERAÇÃO) ---
 elif st.session_state.step == 4:
     st.markdown('<p class="setup-step">VISÃO ANALÍTICA CFO.</p>', unsafe_allow_html=True)
-    agora_br = datetime.now() - timedelta(hours=3) 
+    agora_br = datetime.now() - timedelta(hours=3) # Joinville
     hoje_str = agora_br.strftime("%d/%m/%Y")
     
     g_tot, g_hj = 0.0, 0.0
@@ -188,7 +167,7 @@ elif st.session_state.step == 4:
             g_hj = df_l[df_l['data'].str.contains(hoje_str, na=False)]['valor'].sum()
     except: df_l = pd.DataFrame(columns=['data', 'descricao', 'valor'])
 
-    dias_restantes = max(31 - agora_br.day, 1)
+    d_rest = max(31 - agora_br.day, 1)
     dias = np.arange(1, 32)
     s_d = []
     cx = st.session_state.opening_balance - st.session_state.investments - st.session_state.dreams - g_tot
@@ -201,23 +180,37 @@ elif st.session_state.step == 4:
 
     # GRÁFICO
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=dias, y=[v/1000 for v in s_d], mode='lines', 
-                             line=dict(color='black', width=3), 
-                             hovertemplate='Saldo: %{customdata}<extra></extra>',
-                             customdata=[format_br(v) for v in s_d]))
+    fig.add_trace(go.Scatter(x=dias, y=[v/1000 for v in s_d], mode='lines', line=dict(color='black', width=3), hovertemplate='Saldo: %{customdata}<extra></extra>', customdata=[format_br(v) for v in s_d]))
     fig.add_hline(y=st.session_state.strategic_reserve/1000, line_dash="dash", line_color="#CCC")
     fig.update_layout(plot_bgcolor='white', paper_bgcolor='white', height=250, margin=dict(l=0, r=0, t=10, b=0), xaxis=dict(showgrid=False), yaxis=dict(gridcolor='#F9F9F9', tickformat='.0f', ticksuffix='k'), showlegend=False)
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
+    # KPIS PRINCIPAIS
     ti, to = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
     livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + ti) - to - st.session_state.investments - st.session_state.dreams - g_tot
-    meta_d = (livre + g_hj) / (dias_restantes + 1)
+    meta_d = (livre + g_hj) / (d_rest + 1)
     ct_h = meta_d - g_hj
 
     col1, col2 = st.columns(2)
     with col1: st.markdown(f'<div class="card"><p class="metric-label">Operacional Restante</p><p class="metric-value">{format_br(livre)}</p></div>', unsafe_allow_html=True)
     with col2: st.markdown(f'<div class="card"><p class="metric-label">Cota Restante (Hoje)</p><p class="metric-value">{format_br(ct_h)[:-3]}</p></div>', unsafe_allow_html=True)
 
+    # --- NOVIDADE: PLANEJAMENTO DE COTAS FUTURAS ---
+    with st.expander("📅 PLANEJAMENTO DE COTAS FUTURAS", expanded=True):
+        st.markdown('<p class="setup-step">PROJEÇÃO REBALANCEADA (AMANHÃ EM DIANTE)</p>', unsafe_allow_html=True)
+        # Se d_rest for 0, acabou o mês
+        cota_futura = livre / d_rest if d_rest > 0 else 0
+        
+        proj_html = '<div style="font-size: 11px; color: #666; font-family: \'Inter\'; letter-spacing: 0.5px;">'
+        for i in range(1, 8): # Próximos 7 dias
+            data_proj = agora_br + timedelta(days=i)
+            if data_proj.day > 31: break # Não passa do fim do mês
+            dia_nome = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"][data_proj.weekday()]
+            proj_html += f'<div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 10px 0;"><span>{dia_nome}, {data_proj.strftime("%d/%m")}</span><span style="color:#000; font-weight:600;">{format_br(cota_futura)}</span></div>'
+        proj_html += '</div>'
+        st.markdown(proj_html, unsafe_allow_html=True)
+
+    # AUDITORIA
     with st.expander("DETALHAMENTO E AUDITORIA", expanded=False):
         audit_h = f"""<div style="font-size: 11px; color: #666; font-family: 'Inter'; letter-spacing: 0.5px;">
             <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>(+) SALDO INICIAL</span><span>{format_br(st.session_state.opening_balance)}</span></div>
@@ -228,6 +221,7 @@ elif st.session_state.step == 4:
         </div>"""
         st.markdown(audit_h, unsafe_allow_html=True)
 
+    # LANÇAMENTO
     with st.expander("📝 REGISTRAR NOVO GASTO", expanded=False):
         c_l1, c_l2 = st.columns([2, 1])
         l_d, l_v = c_l1.text_input("DESCRIÇÃO"), c_l2.number_input("VALOR", min_value=0.0, format="%.2f")
@@ -242,7 +236,6 @@ elif st.session_state.step == 4:
 
         if not df_l.empty:
             st.markdown("---")
-            st.markdown('<p style="font-size:10px; color:#888; letter-spacing: 2px;">ÚLTIMOS LANÇAMENTOS:</p>', unsafe_allow_html=True)
             l_html = '<div style="font-size: 11px; color: #666; font-family: \'Inter\'; letter-spacing: 0.5px;">'
             for _, r in df_l.tail(5).iloc[::-1].iterrows():
                 l_html += f'<div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>{r["descricao"]}</span><span>{format_br(r["valor"])}</span></div>'
