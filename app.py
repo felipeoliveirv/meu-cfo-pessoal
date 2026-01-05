@@ -23,39 +23,44 @@ def load_lottieurl(url: str):
 
 lottie_success = load_lottieurl("https://lottie.host/5a2d67a1-94a3-4886-905c-5912389d4d03/GjX1Xl9T8y.json")
 
-# --- CSS ULTRA-MINIMALISTA (NAV STEALTH SEM FUNDO) ---
+# --- CSS CORRIGIDO (FLECHAS TRANSPARENTES) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #FFFFFF; color: #000; }
     
-    /* Botão Principal Estilo CFO. */
+    /* Botões de Ação (Pretos) */
     .stButton>button { 
         width: 100%; background-color: #000 !important; color: #FFF !important; 
         border-radius: 0px; padding: 14px; font-weight: 800; border: none; 
         text-transform: uppercase; letter-spacing: 2px; font-size: 11px;
     }
 
-    /* Twin Arrows ULTRA-STEALTH (Puramente texto) */
-    .nav-btn>div>button {
-        background: transparent !important; 
-        border: none !important; 
-        box-shadow: none !important;
-        color: #000 !important; 
-        font-size: 32px !important; 
-        width: auto !important;
-        height: auto !important;
-        padding: 0 12px !important; 
-        margin: 0 !important; 
-        line-height: 1 !important;
-        transition: color 0.3s ease;
-    }
-    .nav-btn>div>button:hover, .nav-btn>div>button:active, .nav-btn>div>button:focus { 
-        color: #888 !important; 
-        background: transparent !important; 
+    /* --- CORREÇÃO DEFINITIVA DAS FLECHAS --- */
+    /* Isola o container das flechas */
+    [data-testid="stHorizontalBlock"] .nav-arrow-container button {
+        background-color: transparent !important;
         border: none !important;
         box-shadow: none !important;
+        color: #000000 !important; /* Flecha preta */
+        font-size: 32px !important;
+        padding: 0px !important;
+        line-height: 1 !important;
+        min-height: 0px !important;
+        height: auto !important;
+        margin-top: -10px !important; /* Ajuste fino de alinhamento */
     }
+
+    /* Garante que o fundo preto NÃO volte ao passar o mouse ou clicar */
+    [data-testid="stHorizontalBlock"] .nav-arrow-container button:hover,
+    [data-testid="stHorizontalBlock"] .nav-arrow-container button:active,
+    [data-testid="stHorizontalBlock"] .nav-arrow-container button:focus {
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: #666666 !important; /* Cinza sutil ao passar o mouse */
+    }
+    /* --------------------------------------- */
 
     .stNumberInput input, .stTextInput input {
         border: none !important; border-bottom: 1px solid #000 !important;
@@ -105,19 +110,20 @@ if st.session_state.show_anim and lottie_success:
     st.session_state.show_anim = False
     st.rerun()
 
-# --- NAVEGAÇÃO TWIN ARROWS (ULTRA-STEALTH) ---
+# --- NAVEGAÇÃO TWIN ARROWS (COM WRAPPER CORRIGIDO) ---
 if 0 < st.session_state.step < 4:
     c_nav1, c_nav2, _ = st.columns([0.4, 0.4, 9.2])
     with c_nav1:
-        st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
+        # Wrapper específico para aplicar o CSS correto
+        st.markdown('<div class="nav-arrow-container">', unsafe_allow_html=True)
         if st.button("←", key="prev"): st.session_state.step -= 1; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
     with c_nav2:
-        st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
+        st.markdown('<div class="nav-arrow-container">', unsafe_allow_html=True)
         if st.button("→", key="next"): st.session_state.step += 1; st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- SETUP STEPS ---
+# --- FLUXO DE SETUP ---
 if st.session_state.step == 0:
     st.markdown('<p class="setup-step">01_LIQUIDEZ</p>', unsafe_allow_html=True)
     v_t = st.number_input("SALDO ATUAL", min_value=0.0, format="%.2f", value=st.session_state.opening_balance)
@@ -193,7 +199,7 @@ elif st.session_state.step == 4:
             if e['date'] == d: cx -= e['val']
         s_d.append(cx)
 
-    # GRÁFICO (REMOÇÃO DEFINITIVA DO TRACE 0)
+    # GRÁFICO
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=dias, y=[v/1000 for v in s_d], mode='lines', 
                              line=dict(color='black', width=3), 
@@ -237,7 +243,6 @@ elif st.session_state.step == 4:
         if not df_l.empty:
             st.markdown("---")
             st.markdown('<p style="font-size:10px; color:#888; letter-spacing: 2px;">ÚLTIMOS LANÇAMENTOS:</p>', unsafe_allow_html=True)
-            # Tabela Estilo Auditoria
             l_html = '<div style="font-size: 11px; color: #666; font-family: \'Inter\'; letter-spacing: 0.5px;">'
             for _, r in df_l.tail(5).iloc[::-1].iterrows():
                 l_html += f'<div style="display: flex; justify-content: space-between; border-bottom: 1px solid #EEE; padding: 12px 0;"><span>{r["descricao"]}</span><span>{format_br(r["valor"])}</span></div>'
