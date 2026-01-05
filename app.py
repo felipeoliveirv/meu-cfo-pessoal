@@ -13,7 +13,7 @@ def format_br(val):
     if val is None: return "R$ 0,00"
     return "R$ {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- CSS PRECISÃO V47.0 (MÁXIMO MINIMALISMO) ---
+# --- CSS PRECISÃO V48.0 ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -41,9 +41,6 @@ st.markdown("""
     .card { padding: 25px 0; border-bottom: 1px solid #EEE; margin-bottom: 5px; }
     .card-sec { padding: 15px 0; border-bottom: 1px solid #F5F5F5; margin-bottom: 10px; }
     #MainMenu, footer, header {visibility: hidden;}
-    
-    /* Ajuste para remover espaçamentos extras do Streamlit */
-    .block-container { padding-top: 2rem; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -89,7 +86,6 @@ if st.session_state.step == 4:
         df_l = pd.DataFrame(columns=['data', 'descricao', 'valor'])
         g_tot, g_hj = 0.0, 0.0
 
-    # LÓGICA DE PARCELAS
     valor_parcelas_mes = 0.0
     for p in st.session_state.installments:
         try:
@@ -101,9 +97,9 @@ if st.session_state.step == 4:
     d_rest = max(31 - agora_br.day, 1)
     ti, to = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
     
-    # Cálculos cruciais
     livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + ti) - to - st.session_state.investments - st.session_state.dreams - g_tot - valor_parcelas_mes
     ct_h = ((livre + g_hj) / (d_rest + 1)) - g_hj
+    disponivel_total = livre + g_tot
 
     # KPIs PRIMÁRIOS
     col1, col2 = st.columns(2)
@@ -115,46 +111,49 @@ if st.session_state.step == 4:
     with c3: st.markdown(f'<div class="card-sec"><p class="sec-label">Cota (Amanhã)</p><p class="sec-value">{format_br(livre / d_rest if d_rest > 0 else 0)}</p></div>', unsafe_allow_html=True)
     with c4: st.markdown(f'<div class="card-sec"><p class="sec-label">Fatura Atual (Cartão)</p><p class="sec-value">{format_br(valor_parcelas_mes)}</p></div>', unsafe_allow_html=True)
 
-    # --- GRÁFICO DE EVOLUÇÃO (VERSÃO CLEAN/MINIMALISTA) ---
-    st.markdown('<p class="metric-label" style="margin-top:20px;">Performance Mensal (Meta vs Realizado)</p>', unsafe_allow_html=True)
+    # --- GRÁFICO FUNCIONAL E MINIMALISTA ---
+    st.markdown('<p class="metric-label" style="margin-top:25px;">Projeção de Consumo Operacional</p>', unsafe_allow_html=True)
     
-    dias = list(range(1, 32))
-    orcamento_total = livre + g_tot
-    # Linha de queima ideal (começa no total e vai a zero)
-    linha_meta = [orcamento_total - (orcamento_total/30 * (d-1)) for d in dias]
+    dias_mes = list(range(1, 32))
+    # Projeção linear (o quanto você deveria ter sobrando a cada dia)
+    projecao_sobra = [disponivel_total - (disponivel_total/30 * (d-1)) for d in dias_mes]
     
     fig = go.Figure()
 
-    # Linha da Meta (Cinza claro, discreta)
+    # Área de Segurança (Projeção)
     fig.add_trace(go.Scatter(
-        x=dias, y=linha_meta, 
-        mode='lines',
-        line=dict(color='#EEEEEE', width=1, dash='dot'),
-        hoverinfo='skip'
+        x=dias_mes, y=projecao_sobra, 
+        fill='tozeroy', mode='lines',
+        name='Meta de Sobra',
+        line=dict(color='#F0F0F0', width=0.5),
+        fillcolor='rgba(240, 240, 240, 0.5)',
+        hovertemplate='Sobra Sugerida: R$ %{y:,.2f}<extra></extra>'
     ))
 
-    # Barra do Gasto Atual (Preto sólido)
+    # Barra de Status Atual
     fig.add_trace(go.Bar(
         x=[agora_br.day], y=[livre],
+        name='Sobra Real',
         marker_color='#000000',
-        width=0.8,
-        hoverinfo='none'
+        width=0.7,
+        hovertemplate='Sobra Real: R$ %{y:,.2f}<br>Dia: %{x}<extra></extra>'
     ))
 
-    # Layout Ultra-Minimalista
     fig.update_layout(
-        height=120,
-        margin=dict(l=0, r=0, t=10, b=0),
+        height=250,
+        margin=dict(l=0, r=0, t=20, b=0),
         showlegend=False,
+        hovermode="x unified",
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         xaxis=dict(
-            showgrid=False, showline=False, zeroline=False, 
-            tickvals=[1, 15, 30], ticktext=['1', '15', '30'],
-            tickfont=dict(size=10, color='#CCC')
+            showgrid=False, linecolor='#EEE', tickfont=dict(size=10, color='#999'),
+            tickvals=[1, 5, 10, 15, 20, 25, 30], title=""
         ),
-        yaxis=dict(showgrid=False, showline=False, zeroline=False, showticklabels=False),
-        bargap=0.1
+        yaxis=dict(
+            showgrid=True, gridcolor='#F5F5F5', tickfont=dict(size=10, color='#999'),
+            tickprefix="R$ ", title=""
+        )
     )
     
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
@@ -167,7 +166,7 @@ if st.session_state.step == 4:
         <div class="audit-card">📈 <b>Receitas Previstas:</b> + {format_br(ti)}</div>
         <div class="audit-card">📉 <b>Custos Fixos:</b> - {format_br(to)}</div>
         <div class="audit-card">💳 <b>Fatura Estimada:</b> - {format_br(valor_parcelas_mes)}</div>
-        <div class="audit-card" style="background:#000; color:#FFF;"><b>DISPONÍVEL TOTAL:</b> {format_br(livre + g_tot)}</div>
+        <div class="audit-card" style="background:#000; color:#FFF;"><b>DISPONÍVEL TOTAL (MÊS):</b> {format_br(disponivel_total)}</div>
         """, unsafe_allow_html=True)
 
     # GESTÃO DE PARCELAMENTOS
