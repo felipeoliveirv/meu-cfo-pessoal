@@ -12,7 +12,7 @@ def format_br(val):
     if val is None: return "R$ 0,00"
     return "R$ {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- CSS PRECISÃO V56.0 ---
+# --- CSS PRECISÃO V57.0 (ESTÁVEL) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -149,15 +149,20 @@ elif st.session_state.step == 4:
 
     ti, to = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
     
-    # Lógica de Liquidez Diária
+    # Lógica de Liquidez Diária (CORRIGIDA)
     projecao_diaria = []
-    saldo_simulado = st.session_state.opening_balance
-    for d in range(1, 32):
-        inc_dia = sum(i['val'] for i in st.session_state.incomes if i.get('dia', 1) == d)
-        exp_dia = sum(e['val'] for e in st.session_state.expenses if e.get('dia', 1) == d)
-        cc_dia = st.session_state.cc_bill if d == st.session_state.cc_due_day else 0
+    saldo_simulado = st.session_state.opening_balance # Começa com o saldo que você digitou
+    
+    # Simula apenas do dia de HOJE para frente, para não duplicar contas passadas
+    for d in range(hoje_dia, 32):
+        # GARANTE que o 'dia' seja lido como Inteiro (int) para comparar corretamente
+        inc_dia = sum(i['val'] for i in st.session_state.incomes if int(i.get('dia', 1)) == d)
+        exp_dia = sum(e['val'] for e in st.session_state.expenses if int(e.get('dia', 1)) == d)
+        cc_dia = st.session_state.cc_bill if d == int(st.session_state.cc_due_day) else 0
+        
+        # O saldo de hoje já inclui o que você tem no banco, então somamos o que vai cair e tiramos o que vai sair
         saldo_simulado = saldo_simulado + inc_dia - exp_dia - cc_dia
-        if d >= hoje_dia: projecao_diaria.append({"dia": d, "saldo": saldo_simulado})
+        projecao_diaria.append({"dia": d, "saldo": saldo_simulado})
     
     df_proj = pd.DataFrame(projecao_diaria)
     menor_saldo = df_proj['saldo'].min() if not df_proj.empty else 0
@@ -174,22 +179,23 @@ elif st.session_state.step == 4:
     with col1: st.markdown(f'<div class="card"><p class="metric-label">Operacional Restante</p><p class="metric-value">{format_br(livre)}</p></div>', unsafe_allow_html=True)
     with col2: st.markdown(f'<div class="card"><p class="metric-label">Cota Restante (Hoje)</p><p class="metric-value">{format_br(ct_h)}</p></div>', unsafe_allow_html=True)
 
-    # KPIs SECUNDÁRIOS (RESTAURADOS)
+    # KPIs SECUNDÁRIOS
     c3, c4 = st.columns(2)
     with c3: st.markdown(f'<div class="card-sec"><p class="sec-label">Cota (Amanhã)</p><p class="sec-value">{format_br(cota_amanha)}</p></div>', unsafe_allow_html=True)
     with c4: st.markdown(f'<div class="card-sec"><p class="sec-label">Dias Restantes</p><p class="sec-value">{d_rest} Dias</p></div>', unsafe_allow_html=True)
 
-    # GRÁFICO (REFINADO)
+    # GRÁFICO (MVP)
     st.markdown('<p class="metric-label" style="margin-top:25px;">Fluxo de Caixa Projetado (Liquidez)</p>', unsafe_allow_html=True)
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=df_proj['dia'], y=df_proj['saldo'], 
-        fill='tozeroy', mode='lines', 
-        name="Fluxo de Caixa (R$)", 
-        line=dict(color='#F0F0F0', width=0.5), 
-        fillcolor='rgba(240, 240, 240, 0.3)', 
-        hovertemplate='Fluxo: R$ %{y:,.2f}<extra></extra>'
-    ))
+    if not df_proj.empty:
+        fig.add_trace(go.Scatter(
+            x=df_proj['dia'], y=df_proj['saldo'], 
+            fill='tozeroy', mode='lines', 
+            name="Fluxo de Caixa (R$)", 
+            line=dict(color='#F0F0F0', width=0.5), 
+            fillcolor='rgba(240, 240, 240, 0.3)', 
+            hovertemplate='Fluxo: R$ %{y:,.2f}<extra></extra>'
+        ))
     fig.add_trace(go.Bar(
         x=[hoje_dia], y=[livre], 
         marker_color='#000', width=0.6, 
