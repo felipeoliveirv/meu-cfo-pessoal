@@ -13,11 +13,10 @@ def format_br(val):
     if val is None: return "R$ 0,00"
     return "R$ {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- CSS PRECISÃO V60.0 (CALENDAR AWARE) ---
-# --- CSS PRECISÃO V60.0 (LUXURY UPDATE) ---
+# --- CSS PRECISÃO V60.1 (CLEAN LUXURY) ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #FFFFFF; color: #000; }
     
     /* Botões pretos sólidos e arredondados */
@@ -40,15 +39,30 @@ st.markdown("""
     .stNumberInput input:focus, .stTextInput input:focus { border-bottom: 2px solid #000 !important; }
     
     /* Header da Marca */
-    .brand-header { font-size: 18px; font-weight: 900; letter-spacing: -1px; text-transform: uppercase; margin-bottom: 30px; display: inline-block; }
+    .brand-header { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; text-transform: uppercase; margin-bottom: 30px; display: inline-block; }
     
-    /* Métricas Gigantes (Estilo da Imagem) */
-    .metric-label { font-size: 11px; color: #666; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
-    .metric-value { font-size: 48px; font-weight: 900; letter-spacing: -2px; line-height: 1; color: #000; display: block; margin-bottom: 10px; }
+    /* --- CORREÇÃO TIPOGRÁFICA (CLEAN) --- */
+    .metric-label { 
+        font-size: 12px; /* Um pouco maior para leitura fácil */
+        color: #888; 
+        letter-spacing: 1.5px; /* Espaçado para elegância */
+        text-transform: uppercase; 
+        font-weight: 600; 
+        margin-bottom: 6px; 
+    }
+    .metric-value { 
+        font-size: 42px; /* Tamanho grande, mas controlado */
+        font-weight: 700; /* Bold Clássico (não ultra-pesado) */
+        letter-spacing: -0.5px; /* Levemente ajustado, sem esmagar */
+        line-height: 1.2; 
+        color: #000; 
+        display: block; 
+        margin-bottom: 12px; 
+    }
     
     /* Cards Flutuantes */
     .card { 
-        padding: 20px; border-radius: 20px; 
+        padding: 24px; border-radius: 20px; 
         background: #FFFFFF; 
         box-shadow: 0 10px 30px rgba(0,0,0,0.04); 
         margin-bottom: 15px; border: 1px solid #F0F0F0;
