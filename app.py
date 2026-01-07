@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime, timedelta
+import calendar # Nova biblioteca para inteligência de datas
 
 # --- CONFIGURAÇÃO CFO. ---
 st.set_page_config(page_title="CFO. | Operação", layout="centered")
@@ -12,7 +13,7 @@ def format_br(val):
     if val is None: return "R$ 0,00"
     return "R$ {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- CSS PRECISÃO V59.0 (SMART FUTURE) ---
+# --- CSS PRECISÃO V60.0 (CALENDAR AWARE) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -80,7 +81,6 @@ st.markdown('<p class="brand-header">CFO.</p>', unsafe_allow_html=True)
 if st.session_state.step == 0:
     st.markdown('<p class="setup-step">Revisão 01/05</p>', unsafe_allow_html=True)
     st.markdown('### Saldo bancário ATUAL')
-    st.caption("O valor exato que está na sua conta hoje.")
     st.session_state.opening_balance = st.number_input("R$", value=st.session_state.opening_balance, step=100.0, label_visibility="collapsed")
     if st.button("PRÓXIMO"): st.session_state.step = 1; st.rerun()
 
@@ -106,10 +106,14 @@ elif st.session_state.step == 2:
 elif st.session_state.step == 3:
     st.markdown('<p class="setup-step">Revisão 04/05</p>', unsafe_allow_html=True)
     st.markdown('### Fluxo de Receitas e Custos')
+    
+    # Cálculo dinâmico do último dia do mês para limitar o input
+    _, ultimo_dia_mes = calendar.monthrange(datetime.now().year, datetime.now().month)
+    
     with st.expander("Receitas (Salário, Extras)", expanded=True):
         with st.form("f_inc", clear_on_submit=True):
             c1, c2, c3 = st.columns([2, 1, 1])
-            d, v, dia = c1.text_input("Descrição"), c2.number_input("Valor (R$)", min_value=0.0), c3.number_input("Dia", 1, 31, 5)
+            d, v, dia = c1.text_input("Descrição"), c2.number_input("Valor (R$)", min_value=0.0), c3.number_input("Dia", 1, ultimo_dia_mes, 5)
             if st.form_submit_button("ADD"): st.session_state.incomes.append({"desc": d, "val": v, "dia": dia}); st.rerun()
         for idx, i in enumerate(st.session_state.incomes):
             col = st.columns([0.9, 0.1])
@@ -119,7 +123,7 @@ elif st.session_state.step == 3:
     with st.expander("Custos Fixos (Aluguel, Luz)", expanded=False):
         with st.form("f_exp", clear_on_submit=True):
             c1, c2, c3 = st.columns([2, 1, 1])
-            d, v, dia = c1.text_input("Descrição"), c2.number_input("Valor (R$)", min_value=0.0), c3.number_input("Dia", 1, 31, 10)
+            d, v, dia = c1.text_input("Descrição"), c2.number_input("Valor (R$)", min_value=0.0), c3.number_input("Dia", 1, ultimo_dia_mes, 10)
             if st.form_submit_button("ADD"): st.session_state.expenses.append({"desc": d, "val": v, "dia": dia}); st.rerun()
         for idx, e in enumerate(st.session_state.expenses):
             col = st.columns([0.9, 0.1])
@@ -131,12 +135,15 @@ elif st.session_state.step == 3:
     if c2.button("FINALIZAR"):
         data_config = pd.DataFrame([{"parametro": "saldo_inicial", "valor": st.session_state.opening_balance},{"parametro": "reserva", "valor": st.session_state.strategic_reserve},{"parametro": "investimento", "valor": st.session_state.investments},{"parametro": "sonhos", "valor": st.session_state.dreams},{"parametro": "fatura_cc", "valor": st.session_state.cc_bill},{"parametro": "vencimento_cc", "valor": st.session_state.cc_due_day}])
         conn.update(worksheet="Config", data=data_config)
+        
         df_inc = pd.DataFrame(st.session_state.incomes)
         if df_inc.empty: df_inc = pd.DataFrame(columns=["desc", "val", "dia"])
         conn.update(worksheet="Receitas", data=df_inc)
+        
         df_exp = pd.DataFrame(st.session_state.expenses)
         if df_exp.empty: df_exp = pd.DataFrame(columns=["desc", "val", "dia"])
         conn.update(worksheet="Custos", data=df_exp)
+        
         st.session_state.step = 4; st.rerun()
 
 # --- DASHBOARD ---
@@ -145,6 +152,9 @@ elif st.session_state.step == 4:
     hoje_dia = agora_br.day
     hoje_str = agora_br.strftime("%d/%m/%Y")
     
+    # Inteligência de Calendário: Descobre o último dia deste mês (28, 29, 30 ou 31)
+    _, ultimo_dia_mes = calendar.monthrange(agora_br.year, agora_br.month)
+    
     try:
         df_l = conn.read(worksheet="Lancamentos", ttl=0)
         df_l['valor'] = pd.to_numeric(df_l['valor'], errors='coerce').fillna(0)
@@ -152,23 +162,18 @@ elif st.session_state.step == 4:
         g_hj = df_l[df_l['data'].str.contains(hoje_str, na=False)]['valor'].sum()
     except: g_tot, g_hj, df_l = 0.0, 0.0, pd.DataFrame(columns=['data', 'descricao', 'valor'])
 
-    # LÓGICA DE INTELIGÊNCIA TEMPORAL (V59)
-    # 1. Filtra apenas o que é futuro (>= hoje) para calcular o "Restante"
+    # LÓGICA SMART FUTURE
     ti_futuro = sum(i['val'] for i in st.session_state.incomes if int(i.get('dia', 1)) >= hoje_dia)
     to_futuro = sum(e['val'] for e in st.session_state.expenses if int(e.get('dia', 1)) >= hoje_dia)
-    
-    # 2. Cartão: Só desconta se ainda não venceu (>= hoje)
     cc_restante = st.session_state.cc_bill if int(st.session_state.cc_due_day) >= hoje_dia else 0.0
     
-    # 3. Operacional Restante: Saldo Atual + Receitas Futuras - Contas Futuras - CC Futuro - Metas
-    # Nota: g_tot (gastos passados) não é subtraído pois já saiu do saldo bancário atual.
     livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + ti_futuro) - to_futuro - st.session_state.investments - st.session_state.dreams - cc_restante
     
-    # Lógica de Liquidez Diária
+    # Lógica de Liquidez Diária (Ajustada para o Fim do Mês correto)
     projecao_diaria = []
     saldo_simulado = st.session_state.opening_balance
     
-    for d in range(hoje_dia, 32):
+    for d in range(hoje_dia, ultimo_dia_mes + 1):
         inc_dia = sum(i['val'] for i in st.session_state.incomes if int(i.get('dia', 1)) == d)
         exp_dia = sum(e['val'] for e in st.session_state.expenses if int(e.get('dia', 1)) == d)
         cc_dia = st.session_state.cc_bill if d == int(st.session_state.cc_due_day) else 0
@@ -185,10 +190,9 @@ elif st.session_state.step == 4:
         menor_saldo = st.session_state.opening_balance
         dia_critico = hoje_dia
 
-    # Métricas Secundárias
-    d_rest = max(31 - hoje_dia, 1)
+    # Métricas Secundárias (Com dias reais)
+    d_rest = max(ultimo_dia_mes - hoje_dia, 1)
     cota_amanha = livre / d_rest if d_rest > 0 else 0
-    # Cota de hoje considera o gasto de hoje como parte do budget do dia
     ct_h = ((livre + g_hj) / (d_rest + 1)) - g_hj
 
     col1, col2 = st.columns(2)
@@ -204,7 +208,10 @@ elif st.session_state.step == 4:
     if not df_proj.empty:
         fig.add_trace(go.Scatter(x=df_proj['dia'], y=df_proj['saldo'], fill='tozeroy', mode='lines', name="Fluxo (R$)", line=dict(color='#F0F0F0', width=0.5), fillcolor='rgba(240, 240, 240, 0.3)', hovertemplate='Fluxo: R$ %{y:,.2f}<extra></extra>'))
     fig.add_trace(go.Bar(x=[hoje_dia], y=[livre], marker_color='#000', width=0.6, name="Operacional Atual", hovertemplate='Operacional: R$ %{y:,.2f}<extra></extra>'))
-    fig.update_layout(height=250, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, hovermode="x unified", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis=dict(showgrid=False, tickfont=dict(size=10, color='#CCC'), tickvals=[1, 10, 20, 30]), yaxis=dict(showgrid=True, gridcolor='#F9F9F9', tickfont=dict(size=10, color='#CCC')))
+    
+    # Eixo X dinâmico baseado no tamanho do mês
+    tick_vals = [1, 10, 20, ultimo_dia_mes]
+    fig.update_layout(height=250, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, hovermode="x unified", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis=dict(showgrid=False, tickfont=dict(size=10, color='#CCC'), tickvals=tick_vals), yaxis=dict(showgrid=True, gridcolor='#F9F9F9', tickfont=dict(size=10, color='#CCC')))
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     with st.expander("🔍 AUDITORIA E VALE DE CAIXA", expanded=False):
@@ -213,7 +220,6 @@ elif st.session_state.step == 4:
         else:
             st.markdown(f'<div class="audit-card" style="border-left: 3px solid #2ECC71;">✅ <b>Menor Saldo Previsto:</b> {format_br(menor_saldo)} (Dia {dia_critico})</div>', unsafe_allow_html=True)
         
-        # Auditoria agora mostra o que ainda VAI sair (Futuro)
         st.markdown(f"""
         <div class="audit-card">💰 <b>Saldo Atual (Banco):</b> {format_br(st.session_state.opening_balance)}</div>
         <div class="audit-card">🛡️ <b>Reserva Blindada:</b> - {format_br(st.session_state.strategic_reserve)}</div>
