@@ -14,38 +14,57 @@ def format_br(val):
     return "R$ {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
 
 # --- CSS PRECISÃO V60.0 (CALENDAR AWARE) ---
+# --- CSS PRECISÃO V60.0 (LUXURY UPDATE) ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;900&display=swap');
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #FFFFFF; color: #000; }
     
+    /* Botões pretos sólidos e arredondados */
     .stButton>button { 
         width: 100%; background-color: #000 !important; color: #FFF !important; 
-        border-radius: 0px; padding: 14px; font-weight: 800; border: none; 
-        text-transform: uppercase; letter-spacing: 2px; font-size: 11px;
+        border-radius: 12px; padding: 16px; font-weight: 600; border: none; 
+        text-transform: uppercase; letter-spacing: 1px; font-size: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transition: all 0.2s ease;
     }
+    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0,0,0,0.15); }
 
-    div[data-testid="stColumn"]:nth-child(1) .stButton>button {
-        background-color: transparent !important; color: #BBB !important;
-        border: 1px solid #EEE !important; font-size: 16px !important;
-    }
-
+    /* Inputs minimalistas */
     .stNumberInput input, .stTextInput input {
-        border: none !important; border-bottom: 1px solid #000 !important;
-        border-radius: 0px !important; font-size: 24px !important; font-weight: 800 !important;
+        border: none !important; border-bottom: 2px solid #E0E0E0 !important;
+        background-color: transparent !important;
+        border-radius: 0px !important; font-size: 20px !important; font-weight: 600 !important;
+        color: #000 !important; padding-left: 0px !important;
+    }
+    .stNumberInput input:focus, .stTextInput input:focus { border-bottom: 2px solid #000 !important; }
+    
+    /* Header da Marca */
+    .brand-header { font-size: 18px; font-weight: 900; letter-spacing: -1px; text-transform: uppercase; margin-bottom: 30px; display: inline-block; }
+    
+    /* Métricas Gigantes (Estilo da Imagem) */
+    .metric-label { font-size: 11px; color: #666; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+    .metric-value { font-size: 48px; font-weight: 900; letter-spacing: -2px; line-height: 1; color: #000; display: block; margin-bottom: 10px; }
+    
+    /* Cards Flutuantes */
+    .card { 
+        padding: 20px; border-radius: 20px; 
+        background: #FFFFFF; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.04); 
+        margin-bottom: 15px; border: 1px solid #F0F0F0;
+    }
+    .card-sec { 
+        padding: 15px; border-radius: 16px; 
+        background: #F8F8F8; margin-bottom: 10px; 
     }
     
-    .brand-header { font-size: 24px; font-weight: 800; letter-spacing: 6px; text-transform: uppercase; margin-bottom: 20px; border-bottom: 3px solid #000; display: inline-block; }
-    .setup-step { font-size: 10px; color: #888; letter-spacing: 2px; text-transform: uppercase; font-weight: 600; margin-bottom: 5px; }
-    .metric-label { font-size: 10px; color: #999; letter-spacing: 3px; text-transform: uppercase; font-weight: 600; }
-    .metric-value { font-size: 36px; font-weight: 800; margin-top: 5px; letter-spacing: normal; line-height: 1.1; color: #000; display: block; }
+    /* Auditoria estilo "Pílula" */
+    .audit-card { background: #F5F5F5; padding: 12px 18px; border-radius: 12px; margin-bottom: 8px; font-size: 12px; font-weight: 500; color: #444; border: none; }
+    .audit-alert { background: #FFF0F0; color: #D00000; padding: 12px 18px; border-radius: 12px; margin-bottom: 8px; font-size: 12px; font-weight: 700; }
     
-    .audit-card { background: #F9F9F9; padding: 15px; border-left: 3px solid #000; margin-bottom: 5px; font-size: 12px; }
-    .audit-alert { background: #FFF0F0; border-left: 3px solid #FF4B4B; color: #FF4B4B; padding: 15px; margin-bottom: 5px; font-size: 12px; font-weight: 700; }
-    .card { padding: 25px 0; border-bottom: 1px solid #EEE; margin-bottom: 5px; }
-    .card-sec { padding: 15px 0; border-bottom: 1px solid #F5F5F5; margin-bottom: 10px; }
-    .hist-item { display: flex; justify-content: space-between; border-bottom: 1px solid #F0F0F0; padding: 10px 0; font-size: 12px; color: #555; }
+    /* Remover elementos padrão do Streamlit */
     #MainMenu, footer, header {visibility: hidden;}
+    div[data-testid="stExpander"] { border: none; box-shadow: none; background-color: transparent; }
     </style>
     """, unsafe_allow_html=True)
 
