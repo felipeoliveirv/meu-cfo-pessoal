@@ -12,7 +12,7 @@ def format_br(val):
     if val is None: return "R$ 0,00"
     return "R$ {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- CSS PRECISÃO V57.0 (ESTÁVEL) ---
+# --- CSS PRECISÃO V57.0 (MVP FINAL) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -105,20 +105,20 @@ elif st.session_state.step == 2:
 elif st.session_state.step == 3:
     st.markdown('<p class="setup-step">Revisão 04/05</p>', unsafe_allow_html=True)
     st.markdown('### Fluxo de Receitas e Custos')
-    with st.expander("Receitas", expanded=True):
+    with st.expander("Receitas (Salário, Extras)", expanded=True):
         with st.form("f_inc", clear_on_submit=True):
             c1, c2, c3 = st.columns([2, 1, 1])
-            d, v, dia = c1.text_input("Descrição"), c2.number_input("Valor"), c3.number_input("Dia", 1, 31, 5)
+            d, v, dia = c1.text_input("Descrição"), c2.number_input("Valor (R$)", min_value=0.0), c3.number_input("Dia", 1, 31, 5)
             if st.form_submit_button("ADD"): st.session_state.incomes.append({"desc": d, "val": v, "dia": dia}); st.rerun()
         for idx, i in enumerate(st.session_state.incomes):
             col = st.columns([0.9, 0.1])
             col[0].write(f"✅ Dia {i.get('dia', 1)} | {i['desc']}: {format_br(i['val'])}")
             if col[1].button("✕", key=f"d_inc_{idx}"): st.session_state.incomes.pop(idx); st.rerun()
 
-    with st.expander("Custos Fixos", expanded=False):
+    with st.expander("Custos Fixos (Aluguel, Luz)", expanded=False):
         with st.form("f_exp", clear_on_submit=True):
             c1, c2, c3 = st.columns([2, 1, 1])
-            d, v, dia = c1.text_input("Descrição"), c2.number_input("Valor"), c3.number_input("Dia", 1, 31, 10)
+            d, v, dia = c1.text_input("Descrição"), c2.number_input("Valor (R$)", min_value=0.0), c3.number_input("Dia", 1, 31, 10)
             if st.form_submit_button("ADD"): st.session_state.expenses.append({"desc": d, "val": v, "dia": dia}); st.rerun()
         for idx, e in enumerate(st.session_state.expenses):
             col = st.columns([0.9, 0.1])
@@ -149,24 +149,29 @@ elif st.session_state.step == 4:
 
     ti, to = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
     
-    # Lógica de Liquidez Diária (CORRIGIDA)
+    # Lógica de Liquidez Diária (Protegida)
     projecao_diaria = []
-    saldo_simulado = st.session_state.opening_balance # Começa com o saldo que você digitou
+    saldo_simulado = st.session_state.opening_balance
     
-    # Simula apenas do dia de HOJE para frente, para não duplicar contas passadas
+    # Simula apenas a partir de HOJE para não duplicar contas passadas
     for d in range(hoje_dia, 32):
-        # GARANTE que o 'dia' seja lido como Inteiro (int) para comparar corretamente
+        # Garante que 'dia' seja lido como Inteiro mesmo que venha texto do Sheets
         inc_dia = sum(i['val'] for i in st.session_state.incomes if int(i.get('dia', 1)) == d)
         exp_dia = sum(e['val'] for e in st.session_state.expenses if int(e.get('dia', 1)) == d)
         cc_dia = st.session_state.cc_bill if d == int(st.session_state.cc_due_day) else 0
         
-        # O saldo de hoje já inclui o que você tem no banco, então somamos o que vai cair e tiramos o que vai sair
         saldo_simulado = saldo_simulado + inc_dia - exp_dia - cc_dia
         projecao_diaria.append({"dia": d, "saldo": saldo_simulado})
     
     df_proj = pd.DataFrame(projecao_diaria)
-    menor_saldo = df_proj['saldo'].min() if not df_proj.empty else 0
-    dia_critico = df_proj.loc[df_proj['saldo'] == menor_saldo, 'dia'].values[0] if not df_proj.empty else hoje_dia
+    
+    # Prevenção de erro se o dataframe estiver vazio (ex: hoje é dia 31)
+    if not df_proj.empty:
+        menor_saldo = df_proj['saldo'].min()
+        dia_critico = df_proj.loc[df_proj['saldo'] == menor_saldo, 'dia'].values[0]
+    else:
+        menor_saldo = st.session_state.opening_balance
+        dia_critico = hoje_dia
 
     # Métricas CFO.
     livre = (st.session_state.opening_balance - st.session_state.strategic_reserve + ti) - to - st.session_state.investments - st.session_state.dreams - g_tot - st.session_state.cc_bill
