@@ -12,7 +12,7 @@ def format_br(val):
     if val is None: return "R$ 0,00"
     return "R$ {:,.2f}".format(val).replace(",", "X").replace(".", ",").replace("X", ".")
 
-# --- CSS PRECISÃO V57.0 (MVP FINAL) ---
+# --- CSS PRECISÃO V58.0 (ANTI-CRASH) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
@@ -130,8 +130,17 @@ elif st.session_state.step == 3:
     if c2.button("FINALIZAR"):
         data_config = pd.DataFrame([{"parametro": "saldo_inicial", "valor": st.session_state.opening_balance},{"parametro": "reserva", "valor": st.session_state.strategic_reserve},{"parametro": "investimento", "valor": st.session_state.investments},{"parametro": "sonhos", "valor": st.session_state.dreams},{"parametro": "fatura_cc", "valor": st.session_state.cc_bill},{"parametro": "vencimento_cc", "valor": st.session_state.cc_due_day}])
         conn.update(worksheet="Config", data=data_config)
-        conn.update(worksheet="Receitas", data=pd.DataFrame(st.session_state.incomes))
-        conn.update(worksheet="Custos", data=pd.DataFrame(st.session_state.expenses))
+        
+        # Correção de Lista Vazia para Receitas
+        df_inc = pd.DataFrame(st.session_state.incomes)
+        if df_inc.empty: df_inc = pd.DataFrame(columns=["desc", "val", "dia"])
+        conn.update(worksheet="Receitas", data=df_inc)
+        
+        # Correção de Lista Vazia para Custos
+        df_exp = pd.DataFrame(st.session_state.expenses)
+        if df_exp.empty: df_exp = pd.DataFrame(columns=["desc", "val", "dia"])
+        conn.update(worksheet="Custos", data=df_exp)
+        
         st.session_state.step = 4; st.rerun()
 
 # --- DASHBOARD ---
@@ -149,13 +158,11 @@ elif st.session_state.step == 4:
 
     ti, to = sum(i['val'] for i in st.session_state.incomes), sum(e['val'] for e in st.session_state.expenses)
     
-    # Lógica de Liquidez Diária (Protegida)
+    # Lógica de Liquidez Diária
     projecao_diaria = []
     saldo_simulado = st.session_state.opening_balance
     
-    # Simula apenas a partir de HOJE para não duplicar contas passadas
     for d in range(hoje_dia, 32):
-        # Garante que 'dia' seja lido como Inteiro mesmo que venha texto do Sheets
         inc_dia = sum(i['val'] for i in st.session_state.incomes if int(i.get('dia', 1)) == d)
         exp_dia = sum(e['val'] for e in st.session_state.expenses if int(e.get('dia', 1)) == d)
         cc_dia = st.session_state.cc_bill if d == int(st.session_state.cc_due_day) else 0
@@ -165,7 +172,6 @@ elif st.session_state.step == 4:
     
     df_proj = pd.DataFrame(projecao_diaria)
     
-    # Prevenção de erro se o dataframe estiver vazio (ex: hoje é dia 31)
     if not df_proj.empty:
         menor_saldo = df_proj['saldo'].min()
         dia_critico = df_proj.loc[df_proj['saldo'] == menor_saldo, 'dia'].values[0]
